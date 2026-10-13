@@ -1,0 +1,10 @@
+{
+  "name": "OPERA Room Management Demo",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm ci && npm run build",
+  "postAttachCommand": "npm run start:server",
+  "forwardPorts": [3001],
+  "portsAttributes": {
+    "3001": { "label": "OPERA Demo (Node backend + UI)", "onAutoForward": "openBrowser" }
+  }
+}

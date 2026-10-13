@@ -104,7 +104,14 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
       setSnapshot(s);
       unsub = b.subscribe(
         (cs: ChangeSet, origin) => {
-          setSnapshot((prev) => (prev ? applyChanges(prev, cs) : prev));
+          setSnapshot((prev) => {
+            if (!prev) return prev;
+            // version gap => we missed a change set (e.g. dropped SSE): re-sync the full snapshot
+            if (!cs.reset && cs.version > prev.version + 1) {
+              b.load().then((s2) => setSnapshot((cur) => (!cur || s2.version >= cur.version ? s2 : cur))).catch(() => undefined);
+            }
+            return applyChanges(prev, cs);
+          });
           const ids = cs.reset ? [] : (cs.rooms ?? []).map((r) => r.id);
           if (ids.length) {
             const now = Date.now();

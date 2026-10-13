@@ -235,16 +235,18 @@ export class PmsEngine {
         if (cmd.status === 'Pickup' && !p.pickupStatusEnabled) throw new CommandError('Pickup status is not enabled for this property', 'PARAM');
         if (!cmd.roomIds.length) throw new CommandError('Select at least one room');
         let changed = 0;
+        const skipped: string[] = [];
         for (const id of cmd.roomIds) {
           const room = this.room(id);
           if (isOooActive(room, D)) {
-            this.warnings.push(`Room ${room.number} is ${room.outOfOrder!.type} – return it to inventory first (skipped).`);
+            skipped.push(`Room ${room.number} is ${room.outOfOrder!.type} – return it to inventory first.`);
             continue;
           }
           if (room.hkStatus !== cmd.status) changed++;
           this.setHk(room, cmd.status);
         }
-        if (!changed && this.warnings.length === cmd.roomIds.length) throw new CommandError(this.warnings.join(' '), 'ROOM_OOO');
+        if (skipped.length === cmd.roomIds.length) throw new CommandError(skipped.join(' '), 'ROOM_OOO');
+        this.warnings.push(...skipped.map((w) => `${w} (skipped)`));
         return `${changed} room(s) set to ${cmd.status}`;
       }
       case 'setHkOccupancy': {
@@ -328,7 +330,8 @@ export class PmsEngine {
         if (cmd.from > cmd.to) throw new CommandError('From date must be on or before To date');
         if (cmd.from < D) throw new CommandError(`From date cannot be before the business date ${D}`);
         if (!s.oooReasons.some((r) => r.code === cmd.reasonCode)) throw new CommandError('A valid reason code is required');
-        if (cmd.returnStatus === 'Inspected' && !p.inspectedStatusEnabled) throw new CommandError('Return status Inspected is not enabled');
+        if (cmd.returnStatus === 'Inspected' && !p.inspectedStatusEnabled) throw new CommandError('Return status Inspected is not enabled', 'PARAM');
+        if (cmd.returnStatus === 'Pickup' && !p.pickupStatusEnabled) throw new CommandError('Return status Pickup is not enabled', 'PARAM');
         for (const id of cmd.roomIds) {
           const room = this.room(id);
           if (room.outOfOrder) throw new CommandError(`Room ${room.number} already has an ${room.outOfOrder.type} record (${room.outOfOrder.from} – ${room.outOfOrder.to})`, 'ALREADY_OOO');
@@ -507,6 +510,9 @@ export class PmsEngine {
         const wasQueued = !!r.queue;
         r.queue = null;
         if (room.serviceStatus) room.serviceStatus = null;
+        // a fresh arrival invalidates any earlier "vacant" observation (avoids a false Skip discrepancy)
+        room.hkOccupancy = null;
+        room.hkPersons = null;
         this.touchedResv.add(r.id);
         this.touchRoom(room);
         this.emit(EVENTS.CHECK_IN, r.id, [room.id],

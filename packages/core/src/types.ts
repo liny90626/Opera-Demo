@@ -131,7 +131,7 @@ export interface Hotel {
 export interface BusinessEvent {
   id: string;
   seq: number;
-  /** Event code, e.g. UPDATE_HOUSEKEEPING_STATUS */
+  /** Event name, e.g. "UPDATE ROOM STATUS" (OHIP business event naming) */
   eventName: string;
   module: 'HOUSEKEEPING' | 'FRONT_DESK' | 'RESERVATION' | 'INVENTORY' | 'NIGHT_AUDIT';
   hotelId: string;

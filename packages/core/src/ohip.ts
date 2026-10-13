@@ -62,10 +62,21 @@ function run(ctx: Ctx, cmd: Command, source: 'OHIP_API' | 'PBX' = 'OHIP_API'): C
   return r;
 }
 
+const STATUS_400 = new Set(['VALIDATION', 'PARAM', 'BAD_CODE']);
 const ok = (r: CommandResult, extra: Record<string, unknown> = {}) =>
   r.ok
-    ? { status: 200, body: { ...extra, warnings: r.warnings.map((w) => ({ shortText: w })), links: [] } }
-    : err(r.errorCode === 'NOT_FOUND' ? 404 : 409, r.error ?? 'Error', r.error, r.errorCode);
+    ? {
+        status: 200,
+        body: {
+          ...extra,
+          status: 'success',
+          message: r.message,
+          businessEvents: (r.changes?.events ?? r.changes?.reset?.events.slice(0, 1) ?? []).map((e) => `${e.id} ${e.eventName}`),
+          warnings: r.warnings.map((w) => ({ code: 'WARNING', shortText: w })),
+          links: [],
+        },
+      }
+    : err(r.errorCode === 'NOT_FOUND' ? 404 : STATUS_400.has(r.errorCode ?? '') ? 400 : 409, r.error ?? 'Error', r.error, r.errorCode);
 
 function roomOut(v: RoomView) {
   return {
@@ -145,7 +156,7 @@ route('PUT', '/hsk/v1/hotels/:hotelId/rooms/status', 'putRoomRelatedStatus', (ct
   let last: CommandResult | null = null;
   if (b.housekeepingRoomStatus) {
     if (!HK_ENUM.includes(b.housekeepingRoomStatus))
-      return err(400, `Invalid housekeepingRoomStatus "${b.housekeepingRoomStatus}"`, 'Use Clean, Dirty, Pickup or Inspected. OutOfOrder/OutOfService are set via rooms/outOfOrderRooms and rooms/outOfServiceRooms.');
+      return err(400, `Invalid housekeepingRoomStatus "${b.housekeepingRoomStatus}"`, 'Use Clean, Dirty, Pickup or Inspected. OutOfOrder/OutOfService are set via rooms/outOfOrderRooms and rooms/outOfServiceRooms.', 'INVALID_STATUS');
     last = run(ctx, { type: 'setHkStatus', roomIds: rooms, status: b.housekeepingRoomStatus });
     if (!last.ok) return ok(last);
   }
@@ -266,12 +277,26 @@ route('GET', '/fof/v1/hotels/:hotelId/queueReservationsStatistics', 'getQueueRes
 route('POST', '/fof/v1/hotels/:hotelId/reservations/:reservationId/roomAssignments', 'postRoomAssignment', (ctx) => {
   const b = ctx.body ?? {};
   const roomId = b.roomId ?? b.criteria?.roomId;
-  if (!roomId) return err(400, 'roomId is required');
-  const force = !!(b.overrideRoomType ?? b.criteria?.overrides?.roomType ?? b.upgradeAllowed);
+  if (!roomId) return err(400, 'roomId (or criteria.roomId) is required');
+  const force = !!(b.overrideRoomType ?? b.criteria?.updateRoomTypeCharged ?? b.criteria?.overrides?.roomType ?? b.upgradeAllowed);
   return ok(run(ctx, { type: 'assignRoom', reservationId: ctx.params.reservationId, roomId: String(roomId), force }));
 });
-route('POST', '/fof/v1/hotels/:hotelId/reservations/:reservationId/checkIns', 'postCheckIn', (ctx) =>
-  ok(run(ctx, { type: 'checkIn', reservationId: ctx.params.reservationId })),
+route('POST', '/fof/v1/hotels/:hotelId/reservations/:reservationId/checkIns', 'postCheckIn', (ctx) => {
+  const b = ctx.body ?? {};
+  const roomId = b.reservation?.roomId ?? b.roomId;
+  if (roomId) {
+    const a = run(ctx, { type: 'assignRoom', reservationId: ctx.params.reservationId, roomId: String(roomId) });
+    if (!a.ok) return ok(a);
+  }
+  // OHIP stopCheckin=true: put the arrival in the room queue instead of checking in
+  if (b.stopCheckin) return ok(run(ctx, { type: 'queueReservation', reservationId: ctx.params.reservationId }));
+  return ok(run(ctx, { type: 'checkIn', reservationId: ctx.params.reservationId }));
+});
+route('PUT', '/fof/v1/hotels/:hotelId/queuedReservations/:reservationId', 'putQueuedReservation', (ctx) =>
+  ok(run(ctx, { type: 'queueReservation', reservationId: ctx.params.reservationId, priority: ctx.body?.priority })),
+);
+route('DELETE', '/fof/v1/hotels/:hotelId/queuedReservations/:reservationId', 'deleteQueuedReservation', (ctx) =>
+  ok(run(ctx, { type: 'removeFromQueue', reservationId: ctx.params.reservationId })),
 );
 route('PUT', '/fof/v1/hotels/:hotelId/reservations/:reservationId/rooms/:roomId/roomMoves', 'moveInHouseGuest', (ctx) =>
   ok(run(ctx, { type: 'roomMove', reservationId: ctx.params.reservationId, toRoomId: ctx.params.roomId, reason: ctx.body?.reason ?? ctx.body?.roomMoveReason })),

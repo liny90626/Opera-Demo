@@ -474,87 +474,76 @@ OOO 与 OOS 共用同一记录结构，区别在于：OOO 从库存扣除并校�
 - 每次命令成功返回 `changes`（无变化为 null）；server 通过 SSE 广播同一 `ChangeSet`；local backend 通过 BroadcastChannel 广播。
 - 客户端用 `applyChanges(snapshot, cs)` 合并：`rooms/reservations/subscribers` 按 id upsert；`events/deliveries/apiLog` 前插并封顶；`reset` 则整体替换；`cs.version ≤ 本地 version` 且无 apiLog 时忽略（去重/乱序保护）。
 - **断线恢复约定**：SSE 重连成功或检测到 `cs.version > local.version + 1`（版本缺口）时，重新 `GET /api/snapshot` 整体替换（引擎不记录历史 ChangeSet；缺口检测为推荐实现，见偏差 D13）。
-- 轮询通道：`GET /api/events?sinceSeq=N` 返回 `seq > N` 的事件（升序，最多 200 条）及 `nextSeq`、`hotelId`，用于 API Console / 外部系统模拟 OHIP Polling API。
+- 轮询通道：`GET /api/events?sinceSeq=N` 返回 `seq > N` 的事件（升序，最多 100 条）及 `lastSeq`、`hasMore`，用于 API Console / 外部系统模拟 OHIP Polling API。
+- 版本缺口：客户端收到 `cs.version > local.version + 1` 时自动重新拉取全量快照（已实现，评审 R12）。
 
 ### 8.7 入站渠道：OHIP REST façade
 
-**通用头与校验（简化模拟，证据 A 的头名称）**
+**通用头与校验（简化模拟，证据 A 的头名称）** — 以 `packages/core/src/ohip.ts` 实现为准（评审 R1 修订）
 | Header | 规则 |
 |---|---|
-| `x-hotelid` | 必填；须等于 `DEMO1` 且与 URL `{hotelId}` 一致，否则 400 `INVALID_HOTEL` / 403 |
-| `x-app-key` | 必填；Demo 有效值 `demo-app-key`；缺失/错误 → 401 |
-| `Authorization: Bearer <token>` | 必填；有效 = `POST /oauth/v1/tokens` 签发的令牌（有效期 3600s，Demo 不过期校验）或字面值 `demo-token`；否则 401 |
-| `x-externalsystem`、`x-originating-application`、`x-request-id` | 可选；记入 ApiLog；`x-externalsystem` 用作事件 `actor`（缺省 `OHIP-API`） |
+| `Authorization: Bearer <token>` | 必填（`/oauth/v1/tokens` 与 `/api/events` 除外）；有效值 = `POST /oauth/v1/tokens` 返回的 `DEMO_TOKEN`（固定字符串，3600s，Demo 不做过期校验）；否则 401 `INVALID_TOKEN` |
+| `x-app-key` | 必填（`/api/events` 除外）；任意非空值（Demo 示例 `demo-app-key-0001`），缺失 → 401 `MISSING_APP_KEY` |
+| `x-hotelid` | 必填；须与 URL `{hotelId}` 一致，否则 400 `HOTEL_MISMATCH`；`{hotelId}` 非 `DEMO1` → 404 `HOTEL_NOT_FOUND` |
+| `x-externalsystem` | 可选；作为事件 `actor`（缺省取 `x-app-key`） |
 
-所有façade请求写入 `apiLog`（并作为 ChangeSet.apiLog 广播，供 API Console 显示）。命令 `actor.source = OHIP_API`（PBX 端点为 `PBX`）。
+所有 façade 请求写入 `apiLog`（作为 `ChangeSet.apiLog` 广播，供 API Console 显示）。命令 `actor.source = OHIP_API`（PBX 端点为 `PBX`）。
 
-**错误响应（OHIP 风格，格式为 C 级推测）**
+**响应格式**：成功 `200 {status:"success", message, businessEvents:["EVT-000043 UPDATE ROOM STATUS", …], warnings:[{code:"WARNING", shortText}], links:[]}`；失败为 RFC7807 风格：
 ```json
-{ "type": "about:blank", "title": "Room not ready", "status": 409,
+{ "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1", "title": "Room 205 is Dirty. …", "status": 409,
   "detail": "Room 205 is Dirty. Rooms must be Clean or Inspected for check-in. Add the reservation to the Queue?",
   "o:errorCode": "ROOM_NOT_READY" }
 ```
-HTTP 映射见 §6.1。成功响应带 `warnings[]`（`{code:"WARNING", shortText}`）与 `links[]`（可省略）。
+HTTP 映射：`NOT_FOUND`→404；`VALIDATION`/`PARAM`/`BAD_CODE`/`INVALID_STATUS`→400；其他业务错误→409。
 
-**端点表**
-| # | 方法 + 路径 | 映射命令 | 说明 |
+**端点表**（`OHIP_ROUTES()` 可在 `GET /api/ohip-routes` 查询）
+| # | 方法 + 路径 | operationId | 映射命令 / 说明 |
 |---|---|---|---|
-| 1 | `POST /oauth/v1/tokens` | — | body `grant_type=client_credentials`；返回 `{access_token, token_type:"Bearer", expires_in:3600}` |
-| 2 | `PUT /hsk/v1/hotels/{hotelId}/rooms/status` | setHkStatus / setHkOccupancy / setTurndown | 见下例 |
-| 3 | `GET /hsk/v1/hotels/{hotelId}/housekeepingOverview` | 查询 roomViews | 过滤：`fromRoomNumber,toRoomNumber,floor[],roomType[],housekeepingRoomStatus[],frontOfficeRoomStatus[],reservationStatus[],guestServiceRequest,roomAssignmentStatus[]`；返回含顶部各状态计数 `housekeepingRoomStatusInfoList` |
-| 4 | `GET /hsk/v1/hotels/{hotelId}/housekeepingDiscrepancies` | 查询 | `roomDiscrepancyStatus[]=Sleep|Skip|PersonDiscrepancy`、`dueOut` |
-| 5 | `POST /hsk/v1/hotels/{hotelId}/rooms/outOfOrderRooms` | placeOutOfOrder(OOO) | body `criteria.roomRangeList[]` |
-| 6 | `PUT /hsk/v1/hotels/{hotelId}/rooms/outOfOrderRooms` | releaseOutOfOrder | `criteria.roomRepairByRoomNumber[]` |
-| 7 | `GET /hsk/v1/hotels/{hotelId}/rooms/outOfOrderRooms?startDate=` | 查询 | 必填 `startDate`，可选 `endDate`；跨度 ≤ 90 天，否则 400 |
-| 8–10 | `POST/PUT/GET …/rooms/outOfServiceRooms` | OOS 同上 | |
-| 11 | `PUT /hsk/v1/hotels/{hotelId}/serviceRequests` | setServiceStatus | `DoNotDisturb→DND`、`MakeUpRoom→MUR`、`NoStatusSelected→null` |
-| 12 | `PUT /hsk/v1/hotels/{hotelId}/conditions` | setCondition | |
-| 13 | `GET /fof/v1/hotels/{hotelId}/roomStatusStatistics` | roomStatusTile | |
-| 14 | `GET /fof/v1/hotels/{hotelId}/queueReservationsStatistics` | 队列统计 | `totalInQueue`、平均等待 |
-| 15 | `GET /fof/v1/hotels/{hotelId}/queuedReservations` | queueReservations | |
-| 16 | `PUT/DELETE /fof/v1/hotels/{hotelId}/queuedReservations/{reservationId}` | queueReservation / removeFromQueue | |
-| 17 | `GET /fof/v1/hotels/{hotelId}/rooms` | 可分配房检索 | `roomType[]`、`reservationId`（按预订房型/日期过滤）、`hotelRoomStatus[]`；返回 `ready` 标志 |
-| 18 | `POST /fof/v1/hotels/{hotelId}/reservations/{reservationId}/roomAssignments` | assignRoom | `criteria.roomId`；`criteria.updateRoomTypeCharged=true` ⇒ `force`（Demo 约定，OHIP 字段借用） |
-| 19 | `POST /fof/v1/hotels/{hotelId}/reservations/{reservationId}/checkIns` | checkIn | body 可含 `reservation.roomId`（先排房）；`stopCheckin=true` ⇒ queueReservation |
-| 20 | `POST /csh/v1/hotels/{hotelId}/reservations/{reservationId}/checkOuts` | checkOut | 无账务 |
-| 21 | `PUT /fof/v1/hotels/{hotelId}/reservations/{reservationId}/rooms/{roomId}/roomMoves` | roomMove | `criteria.reasonCode` 记入 reason |
-| 22 | `POST /fof/v1/hotels/{hotelId}/interfaces/PBX/roomStatusCodes` | pbxStatusCode | **Demo 扩展**（OHIP 无此端点）：body `{roomNumber, code}` |
-| 23 | `GET /api/events?sinceSeq=` | 轮询 | Demo 自有，模拟 Polling API |
+| 1 | `POST /oauth/v1/tokens` | getOAuthToken | body `{grant_type:"client_credentials"}`；返回 `{access_token, token_type:"Bearer", expires_in:3600}` |
+| 2 | `GET /hsk/v1/hotels/{hotelId}/housekeepingOverview` | getHousekeepingOverview | 过滤 `housekeepingRoomStatus, frontOfficeStatus, floor`（逗号分隔多值）、`fromRoomNumber, toRoomNumber, limit`；返回 `housekeepingRoomInfo.housekeepingRooms.room[]` + `housekeepingRoomStatusInfoList` |
+| 3 | `PUT /hsk/v1/hotels/{hotelId}/rooms/status` | putRoomRelatedStatus | `roomList[{roomId}]` + `housekeepingRoomStatus`(Clean/Dirty/Pickup/Inspected，其余 400 `INVALID_STATUS`) / `housekeepingStatus`(Vacant/Occupied) + `roomPersons.houseKeepingPersons` / `turndownStatus`(Required/NotRequired/Compeleted)；按此顺序依次 exec，跨命令不原子（D11） |
+| 4 | `GET /hsk/v1/hotels/{hotelId}/housekeepingDiscrepancies` | getHousekeepingDiscrepancies | `roomDiscrepancyStatus=Skip,Sleep,PersonDiscrepancy` |
+| 5–7 | `GET/POST/PUT /hsk/v1/hotels/{hotelId}/rooms/outOfOrderRooms` | get/post/completeOutOfOrderRooms | POST `criteria.roomRangeList[0]{roomIds[], roomOutOfOrder{start,end,reasonCode,returnStatus,repairRemarks}}` → placeOutOfOrder；PUT `criteria.roomRepairByRoomNumber[{roomId}]` → releaseOutOfOrder |
+| 8–10 | `GET/POST/PUT …/rooms/outOfServiceRooms` | 同上 (OOS) | 同上 |
+| 11 | `PUT /hsk/v1/hotels/{hotelId}/serviceRequests` | setGuestHousekeepingServiceRequest | `{roomId, guestServiceStatus: DoNotDisturb|MakeUpRoom|NoStatusSelected}` |
+| 12–13 | `GET/PUT /hsk/v1/hotels/{hotelId}/conditions` | getRoomConditions / setRoomCondition | PUT `{roomList[{roomId}], condition|null}` |
+| 14 | `GET /fof/v1/hotels/{hotelId}/roomStatusStatistics` | getRoomsByRoomStatus | Room Status Tile + Room Summary |
+| 15 | `GET /fof/v1/hotels/{hotelId}/rooms` | getHotelRooms | `roomType, frontOfficeStatus, housekeepingRoomStatus` |
+| 16 | `GET /fof/v1/hotels/{hotelId}/queuedReservations` | getQueuedReservations | |
+| 17 | `GET /fof/v1/hotels/{hotelId}/queueReservationsStatistics` | getQueueReservationsStatistics | `totalInQueue, averageQueueTimeCurrentReservations` |
+| 18–19 | `PUT/DELETE /fof/v1/hotels/{hotelId}/queuedReservations/{reservationId}` | put/deleteQueuedReservation | queueReservation（body `priority?`）/ removeFromQueue（Demo 扩展） |
+| 20 | `POST /fof/v1/hotels/{hotelId}/reservations/{reservationId}/roomAssignments` | postRoomAssignment | `{roomId}` 或 `{criteria:{roomId, updateRoomTypeCharged:true}}`（true ⇒ `force`） |
+| 21 | `POST /fof/v1/hotels/{hotelId}/reservations/{reservationId}/checkIns` | postCheckIn | body 可含 `reservation.roomId`（先排房）；`stopCheckin:true` ⇒ queueReservation |
+| 22 | `PUT /fof/v1/hotels/{hotelId}/reservations/{reservationId}/rooms/{roomId}/roomMoves` | moveInHouseGuest | `{reason}` |
+| 23 | `POST /csh/v1/hotels/{hotelId}/reservations/{reservationId}/checkOuts` | postCheckOut | 无账务 |
+| 24 | `PUT /fof/v1/hotels/{hotelId}/interfaces/{interfaceId}/roomStatuses` | putRoomInterfaceStatus | **Demo 语义**：`{roomId, statusCode:"1".."6"}` → pbxStatusCode（OHIP 原端点用于分机权限，码值映射为 Demo 自定义） |
+| 25 | `GET /api/events?sinceSeq=N` | pollBusinessEvents | 无需鉴权；返回 `{events(升序, ≤100), lastSeq, hasMore}`，模拟 Polling API |
 
-> 多命令请求（端点 2）按 **housekeepingRoomStatus → housekeepingStatus → turndownStatus** 顺序依次 `exec`，**跨命令不原子**：中途失败返回该错误并在 `warnings` 附已生效部分（偏差 D11）。
-
-**示例 1：第三方 App 批量置 Clean（端点 2）**
+**示例 1：第三方 App 批量置 Clean（端点 3）**
 ```http
 PUT /hsk/v1/hotels/DEMO1/rooms/status
 x-hotelid: DEMO1
-x-app-key: demo-app-key
-Authorization: Bearer demo-token
+x-app-key: demo-app-key-0001
+Authorization: Bearer <access_token>
 Content-Type: application/json
 
-{ "roomList": [{ "roomId": "305" }, { "roomId": "306" }],
-  "housekeepingRoomStatus": "Clean" }
+{ "roomList": [{ "roomId": "305" }, { "roomId": "306" }], "housekeepingRoomStatus": "Clean" }
 ```
-`200`：
-```json
-{ "status": "success", "message": "2 room(s) set to Clean",
-  "warnings": [], "eventSeqs": [43, 44] }
-```
-拒绝 OOO 经此入口设置：`housekeepingRoomStatus: "OutOfOrder"` → `400`，`o:errorCode: "INVALID_STATUS"`，提示使用 `outOfOrderRooms`（调研 §2.2 建议，偏差 D5）。
+`200 {"status":"success","message":"2 room(s) set to Clean","businessEvents":["EVT-000043 UPDATE ROOM STATUS","EVT-000044 UPDATE ROOM STATUS"],"warnings":[],"links":[]}`
 
-**示例 2：设置 OOO（端点 5）**
+**示例 2：设置 OOO（端点 6）**
 ```json
-{ "criteria": { "roomRangeList": [{
-    "roomIds": ["703"],
-    "roomOutOfOrder": { "start": "2026-10-14", "end": "2026-10-16",
-      "reasonCode": "PLB", "returnStatus": "Dirty", "repairRemarks": "Leak" } }] } }
+{ "criteria": { "roomRangeList": [{ "roomIds": ["703"],
+    "roomOutOfOrder": { "start": "2026-10-14", "end": "2026-10-16", "reasonCode": "PLB", "returnStatus": "Dirty", "repairRemarks": "Leak" } }] } }
 ```
 冲突时 `409`，`o:errorCode: "ROOM_ASSIGNED"`。
 
-**示例 3：入住被拒后排队（端点 19）**
+**示例 3：入住被拒后排队（端点 21）**
 `POST …/checkIns {}` → `409 ROOM_NOT_READY`；再 `POST …/checkIns {"stopCheckin": true}` → `200`，事件 `ADD TO QUEUE`。
 
 ### 8.8 PBX 房态码与移动端
-- **PBX**：客房员在客房话机拨 `1–6`（见 C11）→ API Console 的"PBX status-code simulator"调用端点 22，事件 `source=PBX`。出站方向，PBX 订阅者在入住/退房/换房时开通/关闭外线。
+- **PBX**：客房员在客房话机拨 `1–6`（见 C11）→ API Console 的"PBX status-code simulator"调用端点 24，事件 `source=PBX`。出站方向，PBX 订阅者在入住/退房/换房时开通/关闭外线。
 - **Mobile（`#/mobile`）**：直接调用 `POST /api/commands`（或 local backend），`actor = {name: 客房员姓名, source: MOBILE}`；可用命令：`setHkStatus`（仅 Clean/Pickup，UI 限制）、`setHkOccupancy`（+人数）、`setServiceStatus`（DND）。"我的房间"= `room.attendantId = 所选客房员` 的房间。
 
 ---
@@ -590,7 +579,7 @@ Content-Type: application/json
 |---|---|
 | 实时延迟 | Server 模式：命令返回到其他标签页 UI 更新 ≤ 500 ms（SSE）；local backend：BroadcastChannel ≤ 100 ms。订阅者投递为同步模拟（`latencyMs` 仅为展示值），Sync Monitor 在 1 s 内显示新事件 |
 | 一致性 | 引擎单线程串行执行命令，`version` 单调；命令原子（失败回滚） |
-| 持久化 | Server：内存（重启恢复种子；可选后续落盘，不在范围）。Local backend：每次成功命令后把 `Snapshot` 写入 `localStorage`（key 建议 `opera-demo:snapshot`），加载失败则回退种子；Reset Demo 清空并重建 |
+| 持久化 | Server：内存 + 防抖落盘 `apps/server/data/state.json`（重启后恢复；删除该文件或 Reset Demo 回到种子）。Local backend：每次变更后写 `localStorage['opera-demo/state/v1']`，读取失败回退种子 |
 | 多标签 | Local backend 需**选主**或"单写者"：任一标签执行命令后广播 `ChangeSet`，其他标签 `applyChanges`；推荐方案：执行命令的标签本地运行引擎，并把完整 `Snapshot` 写 `localStorage`，其他标签收到广播后应用 ChangeSet（若版本缺口则读 localStorage）。**并发写同一房间时后写覆盖**（需后续决策，偏差 D13） |
 | 性能 | 96 间房全量派生 < 5 ms；事件/投递封顶 500、ApiLog 封顶 200 |
 | 可靠性 | 订阅者失败率可注入（0–100%）；随机源可注入便于确定性测试（`random` 选项 / `mulberry32`） |
@@ -667,9 +656,9 @@ Content-Type: application/json
 ### S10 OHIP 入站：API Console 与轮询
 1. `POST /oauth/v1/tokens` → 得 token；缺 `x-app-key` 调任意端点 → 401。
 2. `PUT /hsk/v1/hotels/DEMO1/rooms/status` 置 306→Clean → 200；响应下方显示"resulting events"（`UPDATE ROOM STATUS`，source=OHIP_API）；同时 Dashboard 在另一标签实时更新。`housekeepingRoomStatus:"OutOfOrder"` → 400。
-3. `GET /api/events?sinceSeq=<上次nextSeq>` 仅返回新事件，`nextSeq` 前进。
+3. `GET /api/events?sinceSeq=<上次lastSeq>` 仅返回新事件，`lastSeq` 前进。
 4. `GET …/housekeepingDiscrepancies?roomDiscrepancyStatus=Skip` 返回 511（若 S5 未处理）。
-5. PBX 模拟器：房 204 拨 `1` → Clean（source=PBX）；拨 `7` → `BAD_CODE`；拨 `5` → HK 报 Occupied → 差异 warning。
+5. PBX 模拟器（端点 24）：房 204 拨 `1` → Clean（source=PBX）；拨 `7` → 400 `BAD_CODE`；拨 `5` → HK 报 Occupied → 差异 warning。
 6. 参数：关闭 Inspected 后拨 `3` → 400 `PARAM`；开启 `allowCheckInClean=false` 后对 Clean 房入住 → `ROOM_NOT_READY`（消息要求 Inspected）。
 
 ### S11 夜审 (End of Day)
