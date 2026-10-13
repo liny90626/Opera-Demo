@@ -1,0 +1,18 @@
+{
+  "name": "opera-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Learning demo re-creating OPERA Cloud room status management & OHIP room status sync",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w @opera-demo/server & npm run dev -w @opera-demo/web",
+    "dev:server": "npm run dev -w @opera-demo/server",
+    "dev:web": "npm run dev -w @opera-demo/web",
+    "dev:local": "npm run dev:local -w @opera-demo/web",
+    "build": "npm run build -w @opera-demo/web",
+    "build:pages": "npm run build:pages -w @opera-demo/web",
+    "start": "npm run build -w @opera-demo/web && npm run start -w @opera-demo/server",
+    "test": "npm test -w @opera-demo/core && npm test -w @opera-demo/server",
+    "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web"
+  }
+}
