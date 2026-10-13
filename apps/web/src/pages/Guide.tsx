@@ -64,7 +64,7 @@ const SCENARIOS: Scenario[] = [
       ['Both windows show the green connection light.', '两个窗口顶部连接灯均为绿色。'],
       ['The changed room updates in the board window within about a second and flashes yellow.', '看板窗口中该房在约 1 秒内更新，并闪烁黄色提示。'],
       ['Header sync light pulses when the change came from the other window.', '变更来自另一窗口时，顶部同步指示灯闪烁。'],
-      ['Sync Monitor event source is MOBILE and no unrelated subscriber receives a new delivery.', '同步监控事件来源为 MOBILE，无无关订阅者收到新投递。'],
+      ['Sync Monitor event source is MOBILE and no unrelated subscriber receives a new delivery.', '同步监控事件来源为 MOBILE，其他订阅者不产生新投递。'],
     ],
     tip: ['Observe: the Source column in the event stream. Both windows must come from the same browser or the same server.', '观察点：事件流中的 Source 列。两个窗口必须来自同一浏览器（本地模式）或同一服务器。'],
   },

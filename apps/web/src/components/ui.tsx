@@ -337,7 +337,8 @@ export function ActionMenu({ label = 'I Want To…', items, variant = 'secondary
   return (
     <div className="menu-wrap" ref={ref}>
       <Button variant={variant} disabled={disabled} onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }} aria-haspopup="menu" aria-expanded={open}>
-        {label} <span style={{ fontSize: 10 }}>▼</span>
+        {label}
+        {!(typeof label === 'string' && /^[⋮⋯…]$/.test(label.trim())) && <span style={{ fontSize: 10 }}>▼</span>}
       </Button>
       {open && (
         <div className={cx('menu', align === 'left' && 'left')} role="menu" onClick={(e) => e.stopPropagation()}>

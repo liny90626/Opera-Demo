@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { addDays, type BusinessEvent, type HotelParameters } from '@opera-demo/core';
 import { useStore } from '../store';
-import { useT } from '../i18n';
+import { useLang, useT } from '../i18n';
 import { Alert, Button, Checkbox, Confirm, KV, Modal, PageHeader, cx } from '../components/ui';
 import { fmtBusinessDate, fmtDateTime, roomNo } from '../components/status';
 
@@ -12,6 +12,8 @@ type ParamKey = keyof HotelParameters;
 export default function EndOfDay() {
   const { snapshot, views, backendKind, exec, toast } = useStore();
   const t = useT();
+  const lang = useLang();
+  const bd = (iso: string) => fmtBusinessDate(iso, lang);
   const nav = useNavigate();
   const D = snapshot.hotel.businessDate;
   const next = addDays(D, 1);
@@ -113,9 +115,9 @@ export default function EndOfDay() {
             <div className="section-title" style={{ marginBottom: 4 }}>{t('Night Audit', '夜审')}</div>
             <div style={{ fontSize: 16 }}>
               {t('Business Date', '业务日期')}:{' '}
-              <strong>{fmtBusinessDate(D, 'en')}</strong>
+              <strong>{bd(D)}</strong>
               <span className="muted"> → </span>
-              <strong>{fmtBusinessDate(next, 'en')}</strong>
+              <strong>{bd(next)}</strong>
             </div>
           </div>
           <Button variant="primary" size="lg" disabled={running} onClick={() => setConfirmOpen(true)}>
@@ -193,7 +195,7 @@ export default function EndOfDay() {
       {lastEvent && (
         <section className="card card-pad" style={{ marginBottom: 14, borderLeft: '4px solid var(--oc-success)' }}>
           <div className="section-title">
-            {t('Business date rolled', '业务日期已推进')}: {fmtBusinessDate(lastEvent.from)} → {fmtBusinessDate(lastEvent.to)}
+            {t('Business date rolled', '业务日期已推进')}: {bd(lastEvent.from)} → {bd(lastEvent.to)}
           </div>
           {lastEvent.ev ? (
             <>
@@ -241,7 +243,7 @@ export default function EndOfDay() {
           <KV
             items={[
               [t('Backend mode', '后端模式'), backendKind === 'local' ? t('In-browser engine (GitHub Pages mode)', '浏览器内引擎（GitHub Pages 模式）') : t('Node server (apps/server)', 'Node 服务（apps/server）')],
-              [t('Business date', '业务日期'), fmtBusinessDate(D, 'en')],
+              [t('Business date', '业务日期'), bd(D)],
               [t('Hotel', '酒店'), `${snapshot.hotel.name} (${snapshot.hotel.hotelId})`],
               [t('Snapshot version', '快照版本'), String(snapshot.version)],
               [t('Persistence', '持久化'), backendKind === 'local'
@@ -282,7 +284,7 @@ export default function EndOfDay() {
       >
         <div className="col">
           <div>
-            {t('Business date', '业务日期')}: <strong>{fmtBusinessDate(D)}</strong> → <strong>{fmtBusinessDate(next)}</strong>
+            {t('Business date', '业务日期')}: <strong>{bd(D)}</strong> → <strong>{bd(next)}</strong>
           </div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             <li>{t(`Due-outs still in house: ${pre.dueOuts.length}`, `仍在住的预离住客：${pre.dueOuts.length}`)}</li>
