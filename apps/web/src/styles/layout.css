@@ -1,0 +1,56 @@
+.app { min-height: 100%; display: flex; flex-direction: column; }
+.oc-header { background: var(--oc-header-bg); color: var(--oc-header-fg); border-top: 4px solid var(--oc-accent); height: 52px; display: flex; align-items: center; padding: 0 10px 0 0; position: sticky; top: 0; z-index: 60; }
+.oc-burger { width: 52px; height: 48px; border: 0; background: transparent; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.oc-burger:hover { background: rgba(255,255,255,.08); }
+.oc-logo-box { width: 36px; height: 36px; background: #fff; border-radius: 2px; display: flex; align-items: center; justify-content: center; margin-right: 12px; }
+.oc-header .spacer { flex: 1; }
+.oc-date { font-size: 14px; font-weight: 600; padding: 0 16px; white-space: nowrap; }
+.oc-prop { display: flex; align-items: center; gap: 10px; padding: 0 12px; height: 48px; border-left: 1px solid rgba(255,255,255,.15); cursor: pointer; background: transparent; border-top: 0; border-right: 0; border-bottom: 0; color: #fff; text-align: left; }
+.oc-prop:hover { background: rgba(255,255,255,.07); }
+.oc-prop .p1 { font-size: 13px; font-weight: 600; }
+.oc-prop .p2 { font-size: 11px; opacity: .85; }
+.oc-avatar { width: 28px; height: 28px; border-radius: 50%; background: #fff; color: #3c3c3c; display: flex; align-items: center; justify-content: center; }
+.oc-conn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; padding: 0 10px; white-space: nowrap; opacity: .95; }
+.oc-conn .dot { width: 9px; height: 9px; border-radius: 50%; background: #9e9e9e; }
+.oc-conn.online .dot { background: #4caf50; }
+.oc-conn.connecting .dot { background: #ffb300; }
+.oc-conn.offline .dot { background: #e53935; }
+.oc-conn.pulse .dot { animation: oc-pulse 1s ease-out; }
+@keyframes oc-pulse { 0% { box-shadow: 0 0 0 0 rgba(76,175,80,.9); } 100% { box-shadow: 0 0 0 12px rgba(76,175,80,0); } }
+.oc-lang { border: 1px solid rgba(255,255,255,.4); background: transparent; color: #fff; border-radius: 3px; height: 24px; padding: 0 8px; cursor: pointer; font-size: 12px; margin: 0 8px; }
+.oc-lang:hover { background: rgba(255,255,255,.1); }
+
+.oc-menubar { background: #fff; border-bottom: 1px solid var(--oc-border); height: 46px; display: flex; align-items: center; padding: 0 12px; gap: 2px; position: sticky; top: 52px; z-index: 55; }
+.oc-brand { display: flex; align-items: center; gap: 8px; color: var(--oc-brand); font-size: 16px; margin-right: 22px; white-space: nowrap; cursor: pointer; border: 0; background: transparent; }
+.oc-menu { position: relative; }
+.oc-menu > button { height: 46px; border: 0; background: transparent; color: var(--oc-link); font-size: 14px; padding: 0 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.oc-menu > button:hover, .oc-menu.open > button { background: #f0f6f9; }
+.oc-menu.active > button { box-shadow: inset 0 -3px 0 var(--oc-brand); }
+.oc-mega { position: absolute; top: 100%; left: 0; background: #fff; border: 1px solid var(--oc-border); box-shadow: var(--shadow-2); padding: 14px 18px; display: flex; gap: 28px; z-index: 70; min-width: 260px; }
+.oc-mega h4 { font-size: 12px; text-transform: uppercase; color: var(--oc-text-3); letter-spacing: .05em; margin-bottom: 6px; }
+.oc-mega a { display: block; padding: 5px 0; font-size: 13px; white-space: nowrap; }
+.oc-mega a .zh { color: var(--oc-text-3); font-size: 11px; margin-left: 6px; }
+.oc-menubar .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.oc-mode { font-size: 11px; color: var(--oc-text-2); border: 1px dashed var(--oc-border-strong); border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
+
+.oc-side { position: fixed; top: 0; left: 0; bottom: 0; width: 290px; background: #fff; z-index: 120; box-shadow: var(--shadow-2); overflow: auto; padding: 12px 0; }
+.oc-side h4 { font-size: 11px; text-transform: uppercase; color: var(--oc-text-3); padding: 12px 18px 4px; letter-spacing: .05em; }
+.oc-side a { display: block; padding: 8px 18px; color: var(--oc-text); }
+.oc-side a:hover { background: #eef6f9; text-decoration: none; }
+.oc-side a.on { background: #e1f1f5; color: var(--oc-primary-hover); box-shadow: inset 3px 0 0 var(--oc-brand); }
+
+.role-menu { position: absolute; right: 0; top: 100%; background: #fff; color: var(--oc-text); min-width: 260px; border: 1px solid var(--oc-border); box-shadow: var(--shadow-2); z-index: 80; padding: 6px 0; }
+.role-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px 14px; cursor: pointer; }
+.role-menu button:hover { background: #eef6f9; }
+.role-menu button.on { font-weight: 600; color: var(--oc-primary-hover); }
+
+@media (max-width: 1100px) {
+  .oc-date { display: none; }
+  .oc-menubar { overflow-x: auto; }
+  .oc-mode { display: none; }
+}
+@media (max-width: 700px) {
+  .oc-prop .p2, .oc-conn .label { display: none; }
+  .oc-brand span { display: none; }
+  .page { padding: 10px 12px 40px; }
+}

@@ -1,0 +1,50 @@
+:root {
+  /* OPERA Cloud (Alta-era) inspired palette */
+  --oc-header-bg: #3c3c3c;
+  --oc-header-fg: #ffffff;
+  --oc-accent: #f0812d;          /* orange top line */
+  --oc-brand: #137e96;           /* OPERA teal */
+  --oc-link: #1b6fa8;
+  --oc-link-hover: #0e4f7c;
+  --oc-bg: #f2f2f2;
+  --oc-surface: #ffffff;
+  --oc-surface-2: #f8f8f8;
+  --oc-border: #d9d9d9;
+  --oc-border-strong: #b8b8b8;
+  --oc-text: #2b2b2b;
+  --oc-text-2: #5c5c5c;
+  --oc-text-3: #8a8a8a;
+  --oc-primary: #137e96;
+  --oc-primary-hover: #0f6578;
+  --oc-danger: #c9302c;
+  --oc-warning: #e59c13;
+  --oc-success: #3c9f40;
+  --oc-focus: 0 0 0 2px #fff, 0 0 0 4px #1b6fa8;
+
+  /* Room status semantics */
+  --st-inspected: #3c9f40;
+  --st-clean: #2f8fdd;
+  --st-pickup: #f0a030;
+  --st-dirty: #d9363e;
+  --st-ooo: #3d3d3d;
+  --st-oos: #7b5ea7;
+  --st-inspected-bg: #e6f4e6;
+  --st-clean-bg: #e3f0fb;
+  --st-pickup-bg: #fdf1dd;
+  --st-dirty-bg: #fbe5e6;
+  --st-ooo-bg: #e2e2e2;
+  --st-oos-bg: #eee8f6;
+  /* front office / discrepancy */
+  --fo-occupied: #4b4b9b;
+  --fo-vacant: #6f8f6f;
+  --disc-skip: #c2185b;
+  --disc-sleep: #6a1b9a;
+  --disc-person: #ef6c00;
+
+  --radius: 4px;
+  --radius-lg: 8px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-2: 0 4px 16px rgba(0,0,0,.14);
+  --font: "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

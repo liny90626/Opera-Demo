@@ -113,9 +113,9 @@ export interface HotelParameters {
   inspectedStatusEnabled: boolean;
   /** Use "Pickup" status. */
   pickupStatusEnabled: boolean;
-  /** Allow check-in to rooms that are Clean but not Inspected. */
+  /** Allow check-in to rooms that are Clean but not yet Inspected (OPERA allows Clean or Inspected by default). */
   allowCheckInClean: boolean;
-  /** Room statuses that may be assigned to arriving reservations (OPERA "Room Assignment" rule). */
+  /** Night audit sets all occupied rooms to Dirty. */
   autoDirtyOnNightAudit: boolean;
 }
 
@@ -141,6 +141,8 @@ export interface BusinessEvent {
   /** Channel through which the change arrived (UI user, OHIP REST API, PBX code, night audit...). */
   source: ChangeSource;
   primaryKey: string; // e.g. roomId or reservation id
+  /** Rooms affected by this event (used to route sync to external systems). */
+  roomIds: string[];
   /** Changed fields: name -> {oldValue,newValue} like OHIP business events "detail" */
   details: { elementName: string; oldValue: string | null; newValue: string | null }[];
   summary: string;
@@ -253,6 +255,8 @@ export type Command =
   | { type: 'pbxStatusCode'; roomNumber: string; code: string }
   | { type: 'setSubscriber'; subscriberId: string; enabled?: boolean; failureRate?: number }
   | { type: 'retryDelivery'; deliveryId: string }
+  | { type: 'retryAllFailed' }
+  | { type: 'resyncSubscriber'; subscriberId: string }
   | { type: 'nightAudit' }
   | { type: 'setParameters'; parameters: Partial<HotelParameters> }
   | { type: 'resetDemo' };
