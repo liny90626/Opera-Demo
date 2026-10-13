@@ -1,0 +1,13 @@
+.hk-board .search-panel .fields { align-items: end; }
+.hk-checks { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; grid-column: 1 / -1; }
+.hk-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.hk-sum { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px 4px 6px; background: #fff; border: 1px solid var(--oc-border); border-radius: 22px; cursor: pointer; font: inherit; }
+.hk-sum:hover { border-color: var(--oc-primary); }
+.hk-sum.on { border-color: var(--oc-primary); background: #e1f1f5; box-shadow: 0 0 0 1px var(--oc-primary); }
+.hk-sum .n { font-weight: 700; font-size: 16px; }
+.hk-sum .lbl { font-size: 12px; color: var(--oc-text-2); }
+.hk-mini { margin-left: 5px; height: 16px; padding: 0 5px; font-size: 10px; }
+.hk-vip { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e0a100; margin-left: 6px; }
+.hk-warn { color: #d9730d; font-weight: 700; }
+.hk-persons { width: 70px; }
+@media (max-width: 600px) { .hk-sum .lbl { display: none; } }

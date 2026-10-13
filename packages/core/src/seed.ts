@@ -259,7 +259,7 @@ export function createSeed(opts: SeedOptions = {}): Snapshot {
   for (const [i, room] of dirty.slice(0, 3).entries()) {
     const r = newResv({ arrival: D, departure: addDays(D, 2), roomType: room.roomType, status: 'Reserved', roomId: room.id, eta: '10:30' });
     usedForArrival.add(room.id);
-    if (i < 2) r.queue = { queuedAt: ts(10, 15 + i * 20), priority: i + 1 };
+    if (i < 2) r.queue = { queuedAt: new Date(Date.now() - (34 - i * 21) * 60000).toISOString(), priority: i + 1 };
   }
   for (let i = 0; i < 10; i++) {
     newResv({ arrival: D, departure: addDays(D, 1 + Math.floor(rnd() * 4)), roomType: pick(['SK', 'SK', 'ST', 'DK', 'DK', 'JS']), status: 'Reserved' });

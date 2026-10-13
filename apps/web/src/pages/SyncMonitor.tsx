@@ -104,9 +104,10 @@ function SubCard({ sub, drifts, selected, onSelect }: { sub: Subscriber; drifts:
           <b style={{ width: 38, textAlign: 'right', color: rate ? '#c0262d' : undefined }}>{rate}%</b>
         </div>
         <div className="chips">
-          {sub.events.map((e) => (
+          {sub.events.slice(0, 4).map((e) => (
             <span key={e} className="sm-chip">{e}</span>
           ))}
+          {sub.events.length > 4 && <span className="sm-chip" title={sub.events.join(', ')}>+{sub.events.length - 4}</span>}
         </div>
         <div className="sm-mirror">
           {sample.length === 0 && <span className="subtle">{t('mirror: no recent changes', '镜像：暂无近期变化')}</span>}

@@ -236,6 +236,11 @@ export function useFrontDesk(): {
             >
               {t('Assign another room', '更换房间')}
             </Button>
+            {queued && (
+              <Button variant="primary" onClick={() => { const r = notReady!.resv; setNotReady(null); nav(`/front-desk/queue?highlight=${r.id}`); }}>
+                {t('Go to Queue', '前往排队')}
+              </Button>
+            )}
             {!queued && (
               <Button
                 variant="primary"

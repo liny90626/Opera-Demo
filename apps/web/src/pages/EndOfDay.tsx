@@ -98,8 +98,6 @@ export default function EndOfDay() {
     },
   ];
 
-  const expiringLabel = (types: string[]) => types.join(', ');
-
   return (
     <div className="page">
       <PageHeader
