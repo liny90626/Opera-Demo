@@ -7,3 +7,4 @@ export * from './sync.ts';
 export * from './engine.ts';
 export * from './apply.ts';
 export * from './ohip.ts';
+export * from './akubela/index.ts';

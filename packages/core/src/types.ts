@@ -85,6 +85,9 @@ export interface Reservation {
   queue: { queuedAt: string; priority: number } | null;
   eta: string | null; // "14:30"
   specials: string[];
+  /** Guest contact (optional; GRMS requires non-empty values, connector uses placeholders when missing) */
+  email?: string;
+  phone?: string;
   checkedInAt: string | null;
   checkedOutAt: string | null;
 }
@@ -148,7 +151,7 @@ export interface BusinessEvent {
   summary: string;
 }
 
-export type ChangeSource = 'OPERA_UI' | 'MOBILE' | 'OHIP_API' | 'PBX' | 'NIGHT_AUDIT' | 'SYSTEM';
+export type ChangeSource = 'OPERA_UI' | 'MOBILE' | 'OHIP_API' | 'PBX' | 'NIGHT_AUDIT' | 'SYSTEM' | 'AKUBELA';
 
 /** External system subscribed to business events (simulated consumers). */
 export interface Subscriber {
