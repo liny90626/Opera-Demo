@@ -75,6 +75,9 @@ export function createAkubelaService(deps: AkubelaServiceDeps): AkubelaServiceAp
     if (!connector) return;
     try {
       await connector.refreshMasterData();
+      // The simulator starts with no orders: align it once with OPERA's in-house guests so the demo starts consistent.
+      // Real mode never writes to GRMS on startup; use "Reconcile" explicitly there.
+      if (mode === 'sim') await connector.reconcile();
     } catch (e) {
       extraError = toLastError(e);
     }

@@ -227,7 +227,7 @@ test('HK status mapping: Dirty/Pickup → dirty, Clean/Inspected → clean; sync
   const tr = fakeTransport();
   const h = harness(tr);
   await h.conn.refreshMasterData();
-  const [A, B, C, D] = picks(h);
+  const [A, B, C] = picks(h);
   const room = A.id;
   h.run({ type: 'setHkStatus', roomIds: [room], status: 'Dirty' });
   h.run({ type: 'setHkStatus', roomIds: [room], status: 'Clean' });
@@ -238,9 +238,9 @@ test('HK status mapping: Dirty/Pickup → dirty, Clean/Inspected → clean; sync
   const n = h.conn.getState().jobs.length;
   h.run({ type: 'setHkStatus', roomIds: [room], status: 'Dirty' });
   assert.equal(h.conn.getState().jobs.length, n);
-  h.run({ type: 'placeOutOfOrder', roomIds: [B.id], oooType: 'OOO', from: '2026-06-15', to: '2026-06-16', reasonCode: 'MNT', returnStatus: 'Dirty' } as Command);
+  h.run({ type: 'placeOutOfOrder', roomIds: [B.id], oooType: 'OOO', from: '2026-06-15', to: '2026-06-16', reasonCode: h.engine.snapshot().oooReasons[0].code, returnStatus: 'Dirty' } as Command);
   h.run({ type: 'setTurndown', roomIds: [C.id], turndown: 'Required' });
-  h.run({ type: 'setServiceStatus', roomIds: [D.id], service: 'MUR' });
+  h.run({ type: 'setServiceStatus', roomIds: ['0308'], service: 'MUR' });
   const skipped = h.conn.getState().jobs.filter((j) => j.action === 'UNSUPPORTED');
   assert.equal(skipped.length, 3);
   assert.ok(skipped.every((j) => j.status === 'SKIPPED' && /not supported by GRMS OpenAPI/.test(j.summary)));

@@ -24,6 +24,7 @@
 | OHIP API | Integration › API Console | 调用仿 OHIP REST 接口（`/hsk/v1`、`/fof/v1`、`/csh/v1`、OAuth 令牌）、PBX 拨码回写房态、Polling API |
 | 夜审 | Miscellaneous › End of Day | 业务日期滚动、占用房置脏、No Show、OOO 到期；物业参数开关；重置演示数据 |
 | 演示指南 | `#/guide` | 中文分步演示脚本 |
+| **Akubela 客控云对接** | Integration › Akubela GRMS | OPERA 入住/退房/换房/房态 ↔ Akubela GRMS 订单/房态/设备/场景双向同步；真实 UAT 与内置模拟器两种模式；作业队列、重试、API 日志、设备控制 |
 
 **推荐 2 分钟体验**：打开在线演示 → 右上角「指南」→ 场景 S1：左边一个标签页开 *Housekeeping Board*，右边开 *Room Attendant Mobile*，在手机里把一间脏房置为 Clean，观察看板/仪表盘/同步监控的实时变化。
 
@@ -107,6 +108,10 @@ curl -s 'localhost:3001/api/events?sinceSeq=0' | jq '.events[] | {seq, eventName
 | [docs/02-functional-design.md](docs/02-functional-design.md) | 功能设计：领域模型、状态机、21 个命令的业务规则与错误码、事件目录、同步设计、夜审、验收场景 S1–S12 |
 | [docs/03-ui-interaction-design.md](docs/03-ui-interaction-design.md) | 界面与交互设计：设计令牌、共享组件、14 个页面线框与交互、两标签同步演示流程 |
 | [docs/04-design-review.md](docs/04-design-review.md) | 对抗式评审记录：发现、处置、决议与验收 |
+| [docs/06-akubela-grms-api-digest.md](docs/06-akubela-grms-api-digest.md) | Akubela GRMS OpenAPI 摘要（123 个命令）与 UAT 实测 |
+| [docs/07-akubela-integration-design.md](docs/07-akubela-integration-design.md) | Akubela 对接设计与 WBS |
+| [docs/08-akubela-uat-issues.md](docs/08-akubela-uat-issues.md) | UAT 平台问题报告（含 trace_id，可转交 Akubela） |
+| [docs/09-akubela-integration-guide.md](docs/09-akubela-integration-guide.md) | **Akubela 对接使用手册**（配置、同步内容、演示脚本） |
 | [docs/05-deployment-guide.md](docs/05-deployment-guide.md) | **部署方案教程**：GitHub Pages / 静态托管 / Linux + systemd + Nginx(SSE) / Docker / Codespaces，及后续对接真实协议的扩展点 |
 
 ---

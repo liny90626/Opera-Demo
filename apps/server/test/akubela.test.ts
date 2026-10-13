@@ -79,6 +79,10 @@ test('client: error envelope, auth retry, 5xx retryable, redaction', async () =>
     fake.behavior.cmd = () => ({ status: 200, body: { success: false, timestamp: 1, result: { code: 20950001, message: 'api room bind body', detail: { trace_id: 'tf36-abc' } } } });
     await assert.rejects(c.call('get_room_info', {}), (e: any) => e.name === 'GrmsError' && e.code === 20950001 && e.traceId === 'tf36-abc' && e.retryable === false && !e.message.includes('TOPSECRET'));
 
+    // UAT returns HTTP 500 for deterministic binding faults: must not be retried
+    fake.behavior.cmd = () => ({ status: 500, body: { success: false, timestamp: 1, result: { code: 20950005, message: 'api order bind body', detail: { trace_id: 't500' } } } });
+    await assert.rejects(c.call('create_order_info', {}), (e: any) => e.code === 20950005 && e.httpStatus === 500 && e.retryable === false);
+
     fake.behavior.cmd = () => ({ status: 503, body: { success: false, result: { code: 20000000, message: `Internal TOPSECRET`, detail: { trace_id: 't5' } } } });
     await assert.rejects(c.call('x', {}), (e: any) => e.retryable === true && e.httpStatus === 503 && !e.message.includes('TOPSECRET'));
 

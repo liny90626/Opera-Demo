@@ -70,7 +70,9 @@ export function createRealTransport(o: RealTransportOptions): GrmsTransport {
     const code = typeof r?.code === 'number' ? r.code : typeof json?.code === 'number' ? json.code : status || -1;
     const message = redact(String(r?.message ?? json?.message ?? json?.error_description ?? json?.error ?? json?._raw ?? `HTTP ${status}`));
     const traceId: string | undefined = r?.detail?.trace_id ?? json?.detail?.trace_id;
-    const retryable = status >= 500 || AUTH_CODES.has(code) || status === 401;
+    // GRMS answers deterministic request-binding faults ("api … bind body/header") with HTTP 500: retrying cannot help.
+    const deterministic = /bind (body|header)/i.test(message);
+    const retryable = (status >= 500 && !deterministic) || AUTH_CODES.has(code) || status === 401;
     return new GrmsError(message, code, traceId, status, retryable);
   }
 

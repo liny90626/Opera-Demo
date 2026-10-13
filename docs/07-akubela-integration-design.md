@@ -195,3 +195,31 @@
 2. Real 模式（UAT）：令牌、房间清单、房型、设备、订单列表等可用接口实网通过；被平台阻塞的命令在作业日志中显示 code/trace_id，平台修复后 `npm run akubela:verify` 一键回归。
 3. 凭据不出现在仓库、前端产物、日志中（日志脱敏）。
 4. 浏览器视觉核对：OPERA 集成页截图；GRMS 控制台房间状态/订单列表与 OPERA 一致（实网可写后）。
+
+---
+
+## 9. 实施与对抗式评审记录（2026-10-13）
+
+| WBS | 交付 | 结果 |
+|---|---|---|
+| A1 | docs/06 API 摘要（123 命令、模型、映射、错误码） | ✅ |
+| B1 | `simulator.ts` + 测试（文档校验规则、订单生命周期、设备/场景、UAT 故障注入） | ✅ |
+| B2 | `connector.ts` + 15 项测试（含 PMS 引擎 + 模拟器端到端） | ✅ |
+| B3 | `service.ts` / `rest.ts` / 服务端真实客户端 / SSE / 持久化 / `akubela:verify` | ✅ |
+| B4 | 集成页（7 个页签）+ 房间抽屉 GRMS 区块 + 浏览器内模拟器（Pages 版） | ✅ |
+| C1 | 联调：真实 UAT（Node 后端）+ 模拟器端到端（真实浏览器） | ✅ 见 docs/09 §6 |
+
+Lead 评审发现与处置：
+
+| # | 发现 | 处置 |
+|---|---|---|
+| L1 | GRMS 单令牌机制（新令牌使旧令牌失效，`50107041`）——多进程/探测脚本会互相"踢掉"令牌 | 客户端把 `50107041` 视为鉴权错误→自动换令牌重试；文档提示勿多实例共用凭据 |
+| L2 | UAT 对 `bind body/header` 类确定性错误返回 HTTP 500 → 被当作可重试，作业空转 5 次 | 客户端识别 `bind body/header` 为不可重试，立即 FAILED；新增回归测试 |
+| L3 | 前端空调控制使用推测的 `set_temperature/set_hvac_mode`，与文档模型（`control` + `ability_attribute`）及模拟器不一致 | 统一为 `turn_on` + `{preset_temperature}` / `{hvac_mode}`；读取 `preset_temperature` |
+| L4 | 离线设备的控制按钮可点击（必然失败） | 离线设备禁用控制 |
+| L5 | 模拟器启动时无订单，OPERA 50 余位在住客在"房间"页全部显示不一致 | 仅 sim 模式启动后自动对账一次；real 模式绝不在启动时写平台 |
+| L6 | `.env.example` 若原样复制会以占位凭据进入 real 模式 | 凭据行改为注释，默认 sim |
+| L7 | 服务端 `scripts/` 未纳入类型检查 | tsconfig include 增加 scripts |
+| L8 | 模拟器 `dump()` 含 PIN | 确认未经任何 REST 暴露 |
+
+验收证据：真实 UAT——令牌、房间/房型/订单/设备读取通过；入住出站请求真实发出并如实呈现平台 `20950005`。模拟器（Node 后端 + 真实浏览器）——UI 入住→GRMS `checked_in`；GRMS 自助退房→OPERA 退房且不回声；GRMS 置净→OPERA Clean；OPERA 置脏→GRMS dirty；空调控制 200；全部 15 个路由无控制台错误。

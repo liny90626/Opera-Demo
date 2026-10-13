@@ -93,6 +93,14 @@ PORT=3001 npm run start:server
 |---|---|---|
 | `PORT` | `3001` | 监听端口 |
 | `DATA_FILE` | `apps/server/data/state.json` | 数据落盘文件（变更后 0.5s 防抖写入；重启后恢复）。删除该文件 = 恢复初始演示数据 |
+| `AKUBELA_MODE` | 有凭据则 `real`，否则 `sim` | Akubela GRMS 对接模式：`real` / `sim` / `off`（详见 [09](09-akubela-integration-guide.md)） |
+| `AKUBELA_BASE_URL` | `https://api.cbcloud.uat.akubela.com` | GRMS OpenAPI 网关 |
+| `AKUBELA_CLIENT_ID` / `AKUBELA_CLIENT_SECRET` | — | GRMS 客户端凭据（仅服务端，切勿提交到仓库；可写入被 git 忽略的 `.env`） |
+| `AKUBELA_ROOM_MAP` | 空 | 房间映射 `OPERA房号:GRMS房号,...`，如 `201:101` |
+| `AKUBELA_HOTEL_TZ` / `AKUBELA_POLL_SECONDS` | `Asia/Shanghai` / `20` | 酒店时区、GRMS 轮询周期（秒） |
+
+> 服务启动时会读取仓库根目录的 `.env`（已有的环境变量优先）。参考 `.env.example`。
+> 若服务器出网需经 HTTP 代理，Node 22 需设置 `NODE_USE_ENV_PROXY=1`（并按需 `NODE_EXTRA_CA_CERTS`）才能让内置 fetch 走 `HTTPS_PROXY`。
 
 ### 3.3 用 systemd 守护进程
 

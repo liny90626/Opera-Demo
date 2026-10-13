@@ -134,14 +134,16 @@ const isOn = (a: GrmsAbility) => ['on', 'open', 'true', 'opened'].includes(Strin
 function AbilityControl({ device, ability, onDone }: { device: GrmsDevice; ability: GrmsAbility; onDone: () => void }) {
   const { akubelaCall } = useStore();
   const t = useT();
-  const [busy, setBusy] = useState(false);
+  const [sending, setBusy] = useState(false);
+  // offline devices cannot be controlled (GRMS would reject the command)
+  const busy = sending || !device.online;
   const attr = ability.attribute ?? {};
   const [bri, setBri] = useState(Number(attr.brightness ?? 50));
-  const [temp, setTemp] = useState(Number(attr.temperature ?? attr.target_temperature ?? 24));
+  const [temp, setTemp] = useState(Number(attr.preset_temperature ?? attr.temperature ?? attr.target_temperature ?? 24));
   useEffect(() => {
     setBri(Number(attr.brightness ?? 50));
-    setTemp(Number(attr.temperature ?? attr.target_temperature ?? 24));
-  }, [attr.brightness, attr.temperature, attr.target_temperature]);
+    setTemp(Number(attr.preset_temperature ?? attr.temperature ?? attr.target_temperature ?? 24));
+  }, [attr.brightness, attr.preset_temperature, attr.temperature, attr.target_temperature]);
   const send = async (control: string, attribute?: Record<string, unknown>) => {
     setBusy(true);
     await akubelaCall('POST', '/devices/control', { device_id: device.device_id, ability_id: ability.ability_id, control, ...(attribute ? { attribute } : {}) });
@@ -177,14 +179,14 @@ function AbilityControl({ device, ability, onDone }: { device: GrmsDevice; abili
           )}
           {type === 'climate' && (
             <>
-              <Button size="sm" disabled={busy} onClick={() => { const n = Math.max(16, temp - 1); setTemp(n); void send('set_temperature', { temperature: n }); }}>
+              <Button size="sm" disabled={busy} onClick={() => { const n = Math.max(16, temp - 1); setTemp(n); void send('turn_on', { preset_temperature: n }); }}>
                 −
               </Button>
               <span className="mono">{temp}°C</span>
-              <Button size="sm" disabled={busy} onClick={() => { const n = Math.min(30, temp + 1); setTemp(n); void send('set_temperature', { temperature: n }); }}>
+              <Button size="sm" disabled={busy} onClick={() => { const n = Math.min(30, temp + 1); setTemp(n); void send('turn_on', { preset_temperature: n }); }}>
                 +
               </Button>
-              <select className="select" style={{ width: 'auto' }} disabled={busy} value={String(attr.hvac_mode ?? '')} onChange={(e) => send('set_hvac_mode', { hvac_mode: e.target.value })}>
+              <select className="select" style={{ width: 'auto' }} disabled={busy} value={String(attr.hvac_mode ?? '')} onChange={(e) => send('turn_on', { hvac_mode: e.target.value })}>
                 <option value="">{t('Mode…', '模式…')}</option>
                 {['cool', 'heat', 'fan_only', 'dry', 'auto'].map((m) => (
                   <option key={m} value={m}>
