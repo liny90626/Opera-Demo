@@ -1,8 +1,10 @@
 /** Room-level dialogs shared across pages: room detail drawer and Out of Order / Service dialog. */
 import { useEffect, useMemo, useState } from 'react';
-import { addDays, type HkStatus, type OutOfOrderType } from '@opera-demo/core';
+import { Link } from 'react-router-dom';
+import { addDays, type HkStatus, type OutOfOrderType, type RoomView } from '@opera-demo/core';
 import { useStore } from '../store';
 import { useT } from '../i18n';
+import { DeviceList, ErrBadge, Flag, MaskedPin, OrderStateBadge, pmsFlags } from '../pages/akubela/shared';
 import { Alert, Button, Drawer, Field, KV, Modal, Select, TextInput } from './ui';
 import { DiscrepancyBadge, FoBadge, HK_STATUSES, ResvStatusBadge, ServiceBadge, StatusBadge, StatusIcon, fmtDate, fmtDateTime, roomNo, useLabels } from './status';
 
@@ -97,6 +99,56 @@ export function OutOfOrderDialog({ open, roomIds, defaultType = 'OOO', onClose, 
   );
 }
 
+/** GRMS (Akubela) block of the room drawer: mapping, GRMS flags, linked order, devices. */
+function GrmsSection({ v }: { v: RoomView }) {
+  const { akubela: st } = useStore();
+  const t = useT();
+  const [showDev, setShowDev] = useState(false);
+  if (!st || st.mode === 'off') return null;
+  const m = st.mappings.find((x) => x.roomId === v.id);
+  const g = m?.residenceId ? st.grmsRooms[m.residenceId] : null;
+  const p = pmsFlags(v);
+  const link = st.links.find((l) => l.roomId === v.id && !l.closed);
+  return (
+    <div className="aku-grms-section" style={{ marginTop: 18 }}>
+      <div className="section-title">
+        GRMS <span className="badge neutral">{st.mode === 'sim' ? t('Simulator', '模拟器') : 'UAT'}</span>
+      </div>
+      {!m?.residenceId ? (
+        <div className="subtle">
+          {t('This room is not mapped to a GRMS residence.', '该房间未映射到 GRMS 房间。')} <Link to="/integration/akubela">{t('Map it', '去映射')}</Link>
+        </div>
+      ) : (
+        <>
+          <KV
+            items={[
+              [t('GRMS residence', 'GRMS 房间'), `${m.residenceName ?? ''} (${m.origin})`],
+              ['Dirty', <span key="d"><Flag v={g?.dirty} bad={g?.dirty != null && g.dirty !== p.dirty} /></span>],
+              [t('Occupied', '入住'), <span key="o"><Flag v={g?.occupied} bad={g?.occupied != null && g.occupied !== p.occupied} /></span>],
+              ['DND', <span key="n"><Flag v={g?.dnd} bad={g?.dnd != null && g.dnd !== p.dnd} /></span>],
+              [t('Error', '错误'), g?.error ? <span key="e"><ErrBadge e={g.error} /> {g.error.message}</span> : '—'],
+              [
+                t('GRMS order', 'GRMS 订单'),
+                link ? (
+                  <span key="l" className="row-wrap">
+                    <span className="mono">{link.orderNumber}</span> <OrderStateBadge state={link.state} /> <Link to="/integration/akubela">#{link.confirmationNo}</Link>
+                  </span>
+                ) : (
+                  '—'
+                ),
+              ],
+              ['PIN', link ? <MaskedPin key="p" pin={link.pin} /> : '—'],
+            ]}
+          />
+          <div style={{ marginTop: 10 }}>
+            {showDev ? <DeviceList roomId={v.id} /> : <Button size="sm" onClick={() => setShowDev(true)}>{t('Show devices', '显示设备')}</Button>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Room detail drawer: current status, occupant, OOO, quick actions and change history (business events). */
 export function RoomDetailDrawer({ roomId, onClose }: { roomId: string | null; onClose: () => void }) {
   const { viewById, snapshot, exec } = useStore();
@@ -165,6 +217,8 @@ export function RoomDetailDrawer({ roomId, onClose }: { roomId: string | null; o
             [t('Last change', '最后变更'), `${fmtDateTime(v.lastStatusChange)} · ${v.lastChangedBy}`],
           ]}
         />
+
+        <GrmsSection v={v} />
 
         <div className="section-title" style={{ marginTop: 18 }}>
           {t('Room History (business events)', '房间历史（业务事件）')}

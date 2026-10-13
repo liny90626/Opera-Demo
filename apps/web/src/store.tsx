@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   applyChanges,
+  type AkubelaState,
   roomViews,
   type Actor,
   type ChangeSet,
@@ -10,7 +11,7 @@ import {
   type RoomView,
   type Snapshot,
 } from '@opera-demo/core';
-import { createBackend, type Backend, type ConnectionState, type OhipResult } from './backend';
+import { createBackend, type AkubelaResult, type Backend, type ConnectionState, type OhipResult } from './backend';
 import { LangContext, type Lang } from './i18n';
 
 export type Role = 'frontdesk' | 'hk' | 'attendant' | 'integration';
@@ -43,6 +44,10 @@ interface StoreValue {
   conn: ConnectionState;
   exec: (cmd: Command, opts?: ExecOptions) => Promise<CommandResult>;
   ohip: (req: OhipRequest) => Promise<OhipResult>;
+  /** Akubela GRMS integration state (null = integration not available / not loaded yet). */
+  akubela: AkubelaState | null;
+  /** Call an integration REST route. `path` may be relative to /api/integrations/akubela (e.g. '/poll'). Toasts GRMS errors. */
+  akubelaCall: (method: string, path: string, body?: unknown, opts?: { silent?: boolean }) => Promise<AkubelaResult>;
   role: Role;
   setRole: (r: Role) => void;
   lang: Lang;
@@ -83,6 +88,7 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
   const [toasts, setToasts] = useState<ToastMsg[]>([]);
   const [remotePulse, setRemotePulse] = useState(0);
   const [recentRooms, setRecentRooms] = useState<Record<string, number>>({});
+  const [akubela, setAkubela] = useState<AkubelaState | null>(null);
   const toastId = useRef(0);
 
   const toast = useCallback((kind: ToastMsg['kind'], text: string) => {
@@ -102,7 +108,8 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
       if (cancelled) return;
       setBackend(b);
       setSnapshot(s);
-      unsub = b.subscribe(
+      const unsubAku = b.subscribeAkubela((st) => setAkubela(st));
+      const unsubMain = b.subscribe(
         (cs: ChangeSet, origin) => {
           setSnapshot((prev) => {
             if (!prev) return prev;
@@ -130,6 +137,10 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
           if (st === 'online') b.load().then((s2) => setSnapshot((prev) => (!prev || s2.version >= prev.version ? s2 : prev))).catch(() => undefined);
         },
       );
+      unsub = () => {
+        unsubMain();
+        unsubAku();
+      };
     })().catch((e) => {
       console.error(e);
       setConn('offline');
@@ -171,6 +182,29 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
     [backend],
   );
 
+  const akubelaCall = useCallback(
+    async (method: string, path: string, body?: unknown, opts: { silent?: boolean } = {}) => {
+      if (!backend) throw new Error('backend not ready');
+      const full = path.startsWith('/api/') ? path : `/api/integrations/akubela${path}`;
+      const res = await backend.akubela(method, full, body);
+      if (res.status >= 400 || res.status === 0) {
+        if (!opts.silent) {
+          const b = (res.body ?? {}) as Record<string, unknown>;
+          const msg = String(b.message ?? b.error ?? `HTTP ${res.status}`);
+          const code = b.code ?? b.grmsCode;
+          const trace = b.traceId ?? b.trace_id;
+          toast('error', `GRMS: ${msg}${code != null ? ` [${String(code)}]` : ''}${trace ? ` trace ${String(trace)}` : ''}`);
+        }
+      } else {
+        // state-bearing responses refresh immediately (SSE / broadcast will follow)
+        const b = res.body as { state?: AkubelaState } | null;
+        if (b?.state?.settings) setAkubela(b.state);
+      }
+      return res;
+    },
+    [backend, toast],
+  );
+
   const setRole = useCallback((r: Role) => {
     setRoleState(r);
     writePref('opera-demo/role', r);
@@ -198,6 +232,8 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
     conn,
     exec,
     ohip,
+    akubela,
+    akubelaCall,
     role,
     setRole,
     lang,

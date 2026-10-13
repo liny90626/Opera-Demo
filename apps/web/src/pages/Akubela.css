@@ -1,0 +1,26 @@
+.aku-flow { display: flex; align-items: stretch; gap: 8px; padding: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.aku-box { flex: 1 1 160px; border: 1px solid var(--oc-border-strong); border-radius: 6px; padding: 8px 12px; background: #fafafa; display: flex; flex-direction: column; gap: 2px; font-size: 12px; min-width: 0; }
+.aku-box b { font-size: 14px; }
+.aku-box.core { background: linear-gradient(180deg, #e7f3f6, #d4eaf0); border-color: #7fb7c4; }
+.aku-box.grms { background: #fff8e1; border-color: #f0d68a; }
+.aku-arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 20px; color: var(--oc-text-3); }
+.aku-arrow span { font-size: 10px; }
+.aku-back { flex-basis: 100%; font-size: 12px; color: var(--oc-text-2); }
+.aku-conn { margin-bottom: 14px; display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.aku-kv { display: flex; gap: 22px; flex-wrap: wrap; margin: 0; flex: 1; min-width: 0; }
+.aku-kv > div { min-width: 0; }
+.aku-kv dt { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--oc-text-3); font-weight: 700; }
+.aku-kv dd { margin: 2px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+.aku-trunc2 { display: inline-block; max-width: 260px; vertical-align: bottom; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.aku-mismatch td { background: #fdecec !important; }
+.aku-closed td { opacity: .55; }
+.aku-q { width: 130px; }
+.aku-trunc { display: inline-block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; vertical-align: bottom; }
+.aku-json { margin: 0; font-size: 11px; max-width: 360px; max-height: 220px; overflow: auto; background: #f6f6f6; padding: 6px; border-radius: 4px; white-space: pre-wrap; cursor: pointer; }
+.aku-device { border: 1px solid var(--oc-border); border-radius: 6px; padding: 8px 10px; background: #fff; margin-top: 4px; }
+.aku-ability { border-top: 1px dashed var(--oc-border); padding-top: 6px; font-size: 13px; }
+.aku-settings { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px 24px; }
+.aku-setting { min-width: 0; }
+.aku-inline { margin: 0; }
+.aku-grms-section .aku-device { margin-top: 8px; }
+@media (max-width: 700px) { .aku-arrow { transform: rotate(90deg); flex-basis: 100%; flex-direction: row; gap: 6px; } .aku-flow { gap: 4px; } }

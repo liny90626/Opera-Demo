@@ -1,10 +1,11 @@
-import type { Actor, ChangeSet, Command, CommandResult, OhipRequest, Snapshot } from '@opera-demo/core';
-import type { Backend, ConnectionState, OhipResult } from './types';
+import type { AkubelaState, Actor, ChangeSet, Command, CommandResult, OhipRequest, Snapshot } from '@opera-demo/core';
+import type { AkubelaResult, Backend, ConnectionState, OhipResult } from './types';
 
 /** Talks to apps/server: REST commands + Server-Sent Events for realtime sync. */
 export class HttpBackend implements Backend {
   readonly kind = 'http' as const;
   private pendingSelf = new Set<number>();
+  private akuListeners = new Set<(s: AkubelaState) => void>();
   constructor(private base = '') {}
 
   async load(): Promise<Snapshot> {
@@ -41,6 +42,35 @@ export class HttpBackend implements Backend {
     return { status: r.status, body, durationMs: Math.round(performance.now() - t0) };
   }
 
+  async akubela(method: string, path: string, body?: unknown): Promise<AkubelaResult> {
+    try {
+      const r = await fetch(`${this.base}${path}`, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: method === 'GET' || body === undefined ? undefined : JSON.stringify(body),
+      });
+      let b: unknown = null;
+      try {
+        b = await r.json();
+      } catch {
+        b = null;
+      }
+      return { status: r.status, body: b };
+    } catch (e) {
+      return { status: 0, body: { error: String(e) } };
+    }
+  }
+
+  subscribeAkubela(onState: (s: AkubelaState) => void) {
+    this.akuListeners.add(onState);
+    void this.akubela('GET', '/api/integrations/akubela/state').then((r) => {
+      if (r.status === 200 && r.body && typeof r.body === 'object' && 'settings' in r.body) onState(r.body as AkubelaState);
+    });
+    return () => {
+      this.akuListeners.delete(onState);
+    };
+  }
+
   subscribe(onChange: (cs: ChangeSet, origin: 'self' | 'remote') => void, onState: (s: ConnectionState) => void) {
     let es: EventSource | null = null;
     let closed = false;
@@ -49,6 +79,14 @@ export class HttpBackend implements Backend {
       onState('connecting');
       es = new EventSource(`${this.base}/api/stream`);
       es.addEventListener('hello', () => onState('online'));
+      es.addEventListener('akubela', (e) => {
+        try {
+          const st = JSON.parse((e as MessageEvent).data) as AkubelaState;
+          this.akuListeners.forEach((l) => l(st));
+        } catch {
+          /* ignore malformed push */
+        }
+      });
       es.addEventListener('change', (e) => {
         const cs = JSON.parse((e as MessageEvent).data) as ChangeSet;
         const self = this.pendingSelf.delete(cs.version);

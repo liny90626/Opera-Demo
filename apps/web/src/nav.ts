@@ -66,6 +66,11 @@ export const NAV: NavMenu[] = [
           { path: '/integration/api-console', en: 'API Console', zh: 'API 控制台' },
         ],
       },
+      {
+        en: 'Guest Room Management (GRMS)',
+        zh: '客控系统 (GRMS)',
+        items: [{ path: '/integration/akubela', en: 'Akubela GRMS', zh: 'Akubela 客控云' }],
+      },
     ],
   },
   {

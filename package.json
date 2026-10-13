@@ -17,6 +17,7 @@
     "start": "npm run build -w @opera-demo/web && npm run start -w @opera-demo/server",
     "test": "npm test -w @opera-demo/core && npm test -w @opera-demo/server",
     "typecheck": "tsc -p packages/core && tsc -p apps/server && tsc -p apps/web",
-    "start:server": "npm run start -w @opera-demo/server"
+    "start:server": "npm run start -w @opera-demo/server",
+    "akubela:verify": "npm run akubela:verify -w @opera-demo/server --"
   }
 }

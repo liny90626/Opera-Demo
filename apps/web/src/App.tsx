@@ -12,6 +12,7 @@ import QueueRooms from './pages/QueueRooms';
 import MobileAttendant from './pages/MobileAttendant';
 import SyncMonitor from './pages/SyncMonitor';
 import ApiConsole from './pages/ApiConsole';
+import Akubela from './pages/Akubela';
 import EndOfDay from './pages/EndOfDay';
 import Guide from './pages/Guide';
 
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/mobile" element={<MobileAttendant />} />
           <Route path="/integration/sync-monitor" element={<SyncMonitor />} />
           <Route path="/integration/api-console" element={<ApiConsole />} />
+          <Route path="/integration/akubela" element={<Akubela />} />
           <Route path="/misc/end-of-day" element={<EndOfDay />} />
           <Route path="/guide" element={<Guide />} />
           <Route path="*" element={<Navigate to="/" replace />} />

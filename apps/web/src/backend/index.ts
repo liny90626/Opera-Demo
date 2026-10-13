@@ -2,7 +2,7 @@ import type { Backend } from './types';
 import { HttpBackend } from './http';
 import { LocalBackend } from './local';
 
-export type { Backend, ConnectionState, OhipResult } from './types';
+export type { AkubelaResult, Backend, ConnectionState, OhipResult } from './types';
 
 /**
  * Pick the backend: VITE_BACKEND=local (GitHub Pages) runs the engine in the browser;
