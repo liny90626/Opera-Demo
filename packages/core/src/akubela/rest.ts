@@ -62,7 +62,8 @@ function validateSim(body: unknown): SimAction | string {
 
 function errRes(e: unknown): Res {
   if (e instanceof GrmsError) return { status: 502, body: { code: e.code, message: e.message, traceId: e.traceId } };
-  return { status: 500, body: { error: e instanceof Error ? e.message : String(e) } };
+  const msg = e instanceof Error ? e.message : String(e);
+  return { status: /not mapped/i.test(msg) ? 409 : 500, body: { error: msg } };
 }
 
 export async function handleAkubelaRequest(svc: AkubelaServiceApi, method: string, path: string, body: unknown): Promise<Res> {

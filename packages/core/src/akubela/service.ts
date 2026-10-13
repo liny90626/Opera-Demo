@@ -114,6 +114,7 @@ export function createAkubelaService(deps: AkubelaServiceDeps): AkubelaServiceAp
   } catch {
     build('sim', deps.initialState);
   }
+  void refresh(); // master data (residences + auto mappings) loads in the background
   if (deps.autoStart) (connector as AkubelaConnectorApi | null)?.start();
 
   return {

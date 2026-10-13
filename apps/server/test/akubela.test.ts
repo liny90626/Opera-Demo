@@ -121,6 +121,7 @@ test('server: PMS commands flow to GRMS sim and state is exposed (REST + SSE)', 
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const post = (p: string, body: unknown) => fetch(base + p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   try {
+    for (let i = 0; i < 50 && !app.akubela.state().residences.length; i++) await new Promise((res) => setTimeout(res, 10));
     const st0 = await (await fetch(`${base}/api/integrations/akubela/state`)).json();
     assert.equal(st0.mode, 'sim');
     assert.equal(st0.clientIdMasked, null);

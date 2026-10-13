@@ -118,9 +118,7 @@ test('rest: GRMS errors map to 502', async () => {
   const svc = mkSvc({ initialMode: 'real', realTransportFactory: () => failing });
   try {
     const r = await call(svc, 'GET', `${A}/rooms/0201/devices`);
-    // connector may map room->devices itself; whichever way, a GrmsError must surface as 502
-    assert.ok([502, 200, 404].includes(r.status));
-    if (r.status === 502) assert.deepEqual(r.body, { code: 20950001, message: 'bind body', traceId: 'tr-9' });
+    assert.equal(r.status, 409, 'room is unmapped because master data failed to load');
     const sc = await call(svc, 'GET', `${A}/scenes`);
     assert.equal(sc.status, 502);
     assert.deepEqual(sc.body, { code: 20950001, message: 'bind body', traceId: 'tr-9' });
