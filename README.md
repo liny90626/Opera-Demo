@@ -73,7 +73,7 @@ npm test             # 引擎、OHIP façade、服务端 SSE 测试
 npm run typecheck
 ```
 
-也可以用 **GitHub Codespaces** 打开本仓库（已带 `.devcontainer`），会自动构建并在 3001 端口启动完整的 Node 后端形态，可把端口设为 Public 远程访问。
+也可以 `docker build -t opera-demo . && docker run -p 3001:3001 opera-demo`，或用 **GitHub Codespaces** 打开本仓库（已带 `.devcontainer`），会自动构建并在 3001 端口启动完整的 Node 后端形态，可把端口设为 Public 远程访问。
 
 ### OHIP façade 调用示例（Node 后端形态）
 
@@ -91,7 +91,7 @@ curl -s 'localhost:3001/api/events?sinceSeq=0' | jq '.events[] | {seq, eventName
 
 ---
 
-## 4. 部署（GitHub Pages）
+## 4. 部署（GitHub Pages，更多方案见 [docs/05](docs/05-deployment-guide.md)）
 
 `.github/workflows/pages.yml` 在每次推送时：安装依赖 → 类型检查 → 测试 → `npm run build:pages` → 发布到 `gh-pages` 分支。
 
@@ -107,6 +107,7 @@ curl -s 'localhost:3001/api/events?sinceSeq=0' | jq '.events[] | {seq, eventName
 | [docs/02-functional-design.md](docs/02-functional-design.md) | 功能设计：领域模型、状态机、21 个命令的业务规则与错误码、事件目录、同步设计、夜审、验收场景 S1–S12 |
 | [docs/03-ui-interaction-design.md](docs/03-ui-interaction-design.md) | 界面与交互设计：设计令牌、共享组件、14 个页面线框与交互、两标签同步演示流程 |
 | [docs/04-design-review.md](docs/04-design-review.md) | 对抗式评审记录：发现、处置、决议与验收 |
+| [docs/05-deployment-guide.md](docs/05-deployment-guide.md) | **部署方案教程**：GitHub Pages / 静态托管 / Linux + systemd + Nginx(SSE) / Docker / Codespaces，及后续对接真实协议的扩展点 |
 
 ---
 
