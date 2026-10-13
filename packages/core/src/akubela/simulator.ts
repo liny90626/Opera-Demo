@@ -246,7 +246,7 @@ export function createGrmsSimulator(pms: Snapshot, opts: GrmsSimulatorOptions = 
       order_id: '',
       dirty: r.hkStatus === 'Dirty' || r.hkStatus === 'Pickup',
       occupied: false,
-      dnd: false,
+      dnd: r.serviceStatus === 'DND', // mirror the in-room DND switch state at start
     };
   });
   const roomById = new Map(rooms.map((r) => [r.residence_id, r]));

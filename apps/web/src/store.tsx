@@ -219,8 +219,8 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
 
   // test/debug hook used by the end-to-end acceptance script (harmless in production)
   useEffect(() => {
-    (window as unknown as { __operaDemo?: unknown }).__operaDemo = { exec, snapshot, backend: backend?.kind };
-  }, [exec, snapshot, backend]);
+    (window as unknown as { __operaDemo?: unknown }).__operaDemo = { exec, snapshot, backend: backend?.kind, akubela };
+  }, [exec, snapshot, backend, akubela]);
 
   if (!snapshot || !backend) return <LangContext.Provider value={lang}>{fallback}</LangContext.Provider>;
 
