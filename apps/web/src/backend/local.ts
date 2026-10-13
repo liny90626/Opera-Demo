@@ -1,7 +1,7 @@
 import { PmsEngine, applyChanges, handleOhip, createAkubelaService, handleAkubelaRequest, type AkubelaServiceApi, type AkubelaState, type Actor, type ChangeSet, type Command, type CommandResult, type OhipRequest, type Snapshot } from '@opera-demo/core';
 import type { AkubelaResult, Backend, ConnectionState, OhipResult } from './types';
 
-const KEY = 'opera-demo/state/v1';
+const KEY = 'opera-demo/state/v2';
 const CHANNEL = 'opera-demo/sync/v1';
 const AKU_CHANNEL = 'opera-demo/akubela/v1';
 const LEADER_KEY = 'opera-demo/akubela/leader';

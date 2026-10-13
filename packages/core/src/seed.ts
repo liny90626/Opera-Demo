@@ -286,6 +286,27 @@ export function createSeed(opts: SeedOptions = {}): Snapshot {
   const showRoom = vacant.find((r) => r.roomType === 'JS' && !blocked.has(r.id) && !usedForArrival.has(r.id));
   if (showRoom) { showRoom.conditionCode = 'SHW'; showRoom.hkStatus = 'Inspected'; }
 
+  // 9) Room 101 (floor 1): the real room in the Akubela GRMS UAT project "TMG-环境" (auto-mapped by room number).
+  //    Added after the random allocation so all other seeded data stays identical. Vacant & Dirty like the GRMS room.
+  rooms.unshift({
+    id: '0101',
+    number: '101',
+    floor: 1,
+    roomType: 'SK',
+    features: ['NS', 'GRMS'],
+    hkStatus: 'Dirty',
+    outOfOrder: null,
+    hkOccupancy: null,
+    hkPersons: null,
+    serviceStatus: null,
+    turndown: 'Not Required',
+    conditionCode: null,
+    attendantId: null,
+    section: 'A',
+    lastStatusChange: ts(7, 0),
+    lastChangedBy: 'NIGHT AUDIT',
+  });
+
   const hotel = {
     hotelId: 'DEMO1',
     name: 'OPERA Demo Hotel',

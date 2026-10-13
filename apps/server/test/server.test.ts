@@ -10,7 +10,7 @@ test('commands, SSE broadcast and OHIP façade', async () => {
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   try {
     const snap = await (await fetch(`${base}/api/snapshot`)).json();
-    assert.equal(snap.rooms.length, 96);
+    assert.equal(snap.rooms.length, 97);
 
     // open SSE stream and collect change events
     const ctrl = new AbortController();

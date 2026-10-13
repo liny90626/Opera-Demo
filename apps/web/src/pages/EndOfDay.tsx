@@ -247,7 +247,7 @@ export default function EndOfDay() {
               [t('Hotel', '酒店'), `${snapshot.hotel.name} (${snapshot.hotel.hotelId})`],
               [t('Snapshot version', '快照版本'), String(snapshot.version)],
               [t('Persistence', '持久化'), backendKind === 'local'
-                ? t('Browser localStorage (key opera-demo/state/v1). Survives reloads in this browser only; other tabs in the same browser sync live.', '浏览器 localStorage（键 opera-demo/state/v1）。仅在本浏览器内刷新后保留；同一浏览器的其他标签页实时同步。')
+                ? t('Browser localStorage (key opera-demo/state/v2). Survives reloads in this browser only; other tabs in the same browser sync live.', '浏览器 localStorage（键 opera-demo/state/v2）。仅在本浏览器内刷新后保留；同一浏览器的其他标签页实时同步。')
                 : t('Server file: the Node server writes its state to a JSON data file, so every connected browser sees the same data.', '服务器文件：Node 服务把状态写入 JSON 数据文件，所有连接的浏览器看到的是同一份数据。')],
             ]}
           />

@@ -105,7 +105,7 @@ test('mapping: auto by room number, roomMap override by id and number, unmapped 
   const h = harness(tr, { roomMap: { '0210': 'RoomX', '305': '305' } });
   await h.conn.refreshMasterData();
   const m = (id: string) => h.conn.getState().mappings.find((x) => x.roomId === id)!;
-  assert.equal(h.conn.getState().mappings.length, 96);
+  assert.equal(h.conn.getState().mappings.length, 97);
   assert.equal(m('0305').origin, 'manual');
   assert.equal(m('0305').residenceId, 'res-305');
   assert.equal(m('0210').origin, 'manual');

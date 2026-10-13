@@ -20,7 +20,8 @@ cp .env.example .env        # .env 已被 git 忽略
 AKUBELA_CLIENT_ID=<client_id>
 AKUBELA_CLIENT_SECRET=<client_secret>
 AKUBELA_BASE_URL=https://api.cbcloud.uat.akubela.com
-AKUBELA_ROOM_MAP=201:101    # OPERA 房号:GRMS 房号；不配置则按相同房号自动匹配
+# AKUBELA_ROOM_MAP=201:102  # 可选：OPERA 房号:GRMS 房号；默认按相同房号自动匹配
+                            # （Demo 酒店已内置 1 楼 101 房，与 UAT「TMG-环境」的 GRMS 101 房自动对应）
 npm run dev                 # 或 npm start / Docker（环境变量同名）
 ```
 
@@ -77,4 +78,6 @@ npm run dev                 # 或 npm start / Docker（环境变量同名）
 - ✅ 令牌、房间清单、房型、订单列表、设备清单（101 房：HyPanel Elite 10、继电器、红外控制器+美的空调、温湿度、燃气、阀门、开关）在 OPERA 页面实时展示。
 - ✅ OPERA 入住触发 `create_order_info` 已真实发往 UAT，平台返回 `20950005`（见 08 文档）——连接器侧行为正确。
 - ⛔ 房态读写、订单创建、告警等受平台缺陷阻塞，待 Akubela 修复后执行 `npm run akubela:verify -- --write` 回归，无需改代码。
-- ⚠️ 设备控制指令采用文档模型（`control` + `ability_attribute` 中的属性，如空调 `turn_on` + `preset_temperature`），附录《标准设备模型》页面无法访问，真实设备上的控制写入尚未实测（UAT 101 房在线的继电器类型为 Siren，未贸然触发）。
+- ✅ 真实设备控制已实测（经授权）：101 房在线继电器 Relay1 `turn_on` → 读回 on → `turn_off` → 读回 off，已恢复原状。指令格式为文档模型（`control` + `ability_attribute` 中的属性，如空调 `turn_on` + `preset_temperature`）。
+- ℹ️ 平台对**离线设备**的控制请求同样返回 `success: true`（不会报错，但设备不会动作），因此 OPERA 页面对离线设备禁用控制按钮。
+- ℹ️ OPERA Demo 酒店新增 1 楼 **101 房**，与 GRMS 101 房按房号自动映射，无需配置 `AKUBELA_ROOM_MAP`。

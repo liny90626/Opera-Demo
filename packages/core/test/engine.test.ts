@@ -8,19 +8,19 @@ const ui = { name: 'TEST', source: 'OPERA_UI' as const };
 test('seed has consistent data', () => {
   const e = mk();
   const s = e.snapshot();
-  assert.equal(s.rooms.length, 96);
+  assert.equal(s.rooms.length, 97);
   const views = roomViews(s);
   const sum = roomSummary(s, views);
   assert.equal(sum.outOfOrder, 1);
   assert.equal(sum.outOfService, 1);
-  assert.equal(sum.inventory, 95);
+  assert.equal(sum.inventory, 96);
   assert.ok(sum.discrepancies >= 3, 'seeded discrepancies');
   // no room double-booked by in-house guests
   const inh = s.reservations.filter((r) => r.status === 'InHouse').map((r) => r.roomId);
   assert.equal(new Set(inh).size, inh.length);
   const tile = roomStatusTile(views);
   const total = tile.reduce((a, t) => a + t.occupied + t.assigned + t.vacant, 0);
-  assert.equal(total, 94); // 96 minus OOO and OOS
+  assert.equal(total, 95); // 97 minus OOO and OOS
   assert.equal(s.subscribers.length, 5);
 });
 
