@@ -417,7 +417,7 @@ export default function ApiConsole() {
                     >
                       <td className="mono">{fmtSec(a.timestamp)}</td>
                       <td><span className={`ac-m ${a.method}`}>{a.method}</span></td>
-                      <td className="mono" style={{ wordBreak: 'break-all' }}>{a.path}</td>
+                      <td className="mono" style={{ minWidth: 260 }}>{a.path}</td>
                       <td><span className={cx('ac-st', statusClass(a.status))}>{a.status}</span></td>
                       <td className="mono subtle">{a.appKey ?? '—'}</td>
                     </tr>

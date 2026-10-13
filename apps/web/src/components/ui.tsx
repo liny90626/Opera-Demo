@@ -2,7 +2,8 @@
  * Shared OPERA-style UI kit. Pages should compose these instead of re-inventing markup.
  * Styling lives in styles/components.css.
  */
-import { useEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
@@ -332,39 +333,80 @@ export type MenuItem =
   | { group: ReactNode };
 
 export function ActionMenu({ label = 'I Want To…', items, variant = 'secondary', align = 'right', disabled }: { label?: ReactNode; items: MenuItem[]; variant?: 'primary' | 'secondary' | 'link'; align?: 'left' | 'right'; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useOutside<HTMLDivElement>(open, () => setOpen(false));
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const btnRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const open = !!pos;
+  const close = () => setPos(null);
+  // The menu is portalled to <body> with fixed positioning so scrolling tables (.table-wrap) never clip it.
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) close();
+    };
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    document.addEventListener('mousedown', h);
+    document.addEventListener('keydown', k);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', h);
+      document.removeEventListener('keydown', k);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  // keep the menu inside the viewport vertically
+  useLayoutEffect(() => {
+    if (!pos || !menuRef.current || !btnRef.current) return;
+    const m = menuRef.current.getBoundingClientRect();
+    if (m.bottom > window.innerHeight - 8) {
+      const b = btnRef.current.getBoundingClientRect();
+      const top = Math.max(8, b.top - m.height - 4);
+      if (top !== pos.top) setPos({ ...pos, top });
+    }
+  }, [pos]);
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (open) return close();
+    const b = btnRef.current!.getBoundingClientRect();
+    setPos(align === 'left' || b.right < 240 ? { top: b.bottom + 4, left: b.left } : { top: b.bottom + 4, right: window.innerWidth - b.right });
+  };
+  const iconOnly = typeof label === 'string' && /^[⋮⋯…]$/.test(label.trim());
   return (
-    <div className="menu-wrap" ref={ref}>
-      <Button variant={variant} disabled={disabled} onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }} aria-haspopup="menu" aria-expanded={open}>
+    <div className="menu-wrap" ref={btnRef}>
+      <Button variant={variant} disabled={disabled} onClick={toggle} onDoubleClick={(e) => e.stopPropagation()} aria-haspopup="menu" aria-expanded={open}>
         {label}
-        {!(typeof label === 'string' && /^[⋮⋯…]$/.test(label.trim())) && <span style={{ fontSize: 10 }}>▼</span>}
+        {!iconOnly && <span style={{ fontSize: 10 }}>▼</span>}
       </Button>
-      {open && (
-        <div className={cx('menu', align === 'left' && 'left')} role="menu" onClick={(e) => e.stopPropagation()}>
-          {items.map((it, i) =>
-            'divider' in it ? (
-              <div key={i} className="menu-sep" />
-            ) : 'group' in it ? (
-              <div key={i} className="menu-group">{it.group}</div>
-            ) : (
-              <button
-                key={i}
-                role="menuitem"
-                className="menu-item"
-                style={it.danger ? { color: 'var(--oc-danger)' } : undefined}
-                disabled={it.disabled}
-                onClick={() => {
-                  setOpen(false);
-                  it.onClick();
-                }}
-              >
-                {it.label}
-              </button>
-            ),
-          )}
-        </div>
-      )}
+      {pos &&
+        createPortal(
+          <div ref={menuRef} className="menu" role="menu" style={{ position: 'fixed', top: pos.top, left: pos.left, right: pos.right ?? 'auto', zIndex: 150 }} onClick={(e) => e.stopPropagation()}>
+            {items.map((it, i) =>
+              'divider' in it ? (
+                <div key={i} className="menu-sep" />
+              ) : 'group' in it ? (
+                <div key={i} className="menu-group">{it.group}</div>
+              ) : (
+                <button
+                  key={i}
+                  role="menuitem"
+                  className="menu-item"
+                  style={it.danger ? { color: 'var(--oc-danger)' } : undefined}
+                  disabled={it.disabled}
+                  onClick={() => {
+                    close();
+                    it.onClick();
+                  }}
+                >
+                  {it.label}
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
