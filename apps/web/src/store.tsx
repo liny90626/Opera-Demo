@@ -183,6 +183,11 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
   const views = useMemo(() => (snapshot ? roomViews(snapshot) : []), [snapshot]);
   const viewById = useMemo(() => new Map(views.map((v) => [v.id, v])), [views]);
 
+  // test/debug hook used by the end-to-end acceptance script (harmless in production)
+  useEffect(() => {
+    (window as unknown as { __operaDemo?: unknown }).__operaDemo = { exec, snapshot, backend: backend?.kind };
+  }, [exec, snapshot, backend]);
+
   if (!snapshot || !backend) return <LangContext.Provider value={lang}>{fallback}</LangContext.Provider>;
 
   const value: StoreValue = {

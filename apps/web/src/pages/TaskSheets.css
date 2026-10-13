@@ -1,0 +1,17 @@
+/* Task Sheets: credit load bar */
+.ts-bar { height: 8px; min-width: 120px; background: #e5e5e5; border-radius: 4px; overflow: hidden; }
+.ts-fill { height: 100%; background: var(--oc-primary); transition: width .3s ease; }
+.ts-fill.over { background: var(--oc-danger); }
+.ts-load { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+.ts-load .txt { font-size: 12px; color: var(--oc-text-2); }
+.ts-load .txt.over { color: var(--oc-danger); font-weight: 600; }
+.ts-done { color: var(--oc-success); font-weight: 700; }
+.ts-skip { color: var(--oc-danger); font-size: 11px; }
+.ts-gen-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.ts-gen-opts .check { white-space: nowrap; }
+.ts-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--oc-border); }
+.ts-head .title { font-size: 15px; color: var(--oc-text); }
+.ts-head .meta { font-size: 12px; color: var(--oc-text-2); margin-top: 2px; }
+.ts-bar-wrap { display: flex; align-items: center; gap: 10px; min-width: 240px; flex: 1; max-width: 420px; }
+.ts-warn { margin-bottom: 14px; }
+.ts-ol { margin: 4px 0 0 18px; padding: 0; }
