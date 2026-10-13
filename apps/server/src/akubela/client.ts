@@ -15,7 +15,8 @@ const TOKEN_PATH = '/api/v1.0/invoke/open-ability/method/oauth2/token';
 const CMD_PATH = '/api/v1.0/invoke/open-ability/method/hotel-commands';
 const SCOPE = 'hotel';
 /** Codes that mean "token invalid/expired" -> refresh and retry. */
-const AUTH_CODES = new Set([20000401, 20000402, 20000403, 40100000, 40100001]);
+// 50107041 = token superseded: GRMS keeps only one active token per client, a newer token invalidates older ones.
+const AUTH_CODES = new Set([50107041, 20000401, 20000402, 20000403, 40100000, 40100001]);
 
 interface Token {
   accessToken: string;
