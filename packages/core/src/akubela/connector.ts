@@ -441,6 +441,8 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
       job.status = 'SUCCEEDED';
       job.lastError = null;
       st.stats.jobsSucceeded++;
+      // show the effect right away instead of waiting for the next poll (read-only: no inbound rules applied)
+      if (job.roomId && job.action !== 'UNSUPPORTED') await refreshSnapshot(job.roomId);
     } catch (e) {
       if (e instanceof SkipError) {
         job.status = 'SKIPPED';
@@ -722,6 +724,20 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
           if (deps.pms.exec({ type: 'setServiceStatus', roomIds: [roomId], service: null }, AKUBELA_ACTOR).ok) applied(`GRMS: room ${room.number} Do Not Disturb off`);
         }
       }
+    }
+  }
+
+  async function refreshSnapshot(roomId: string): Promise<void> {
+    const m = st.mappings.find((x) => x.roomId === roomId);
+    if (!m?.residenceId) return;
+    try {
+      const info = await grms<GrmsRoomInfo>('get_room_info', { residence_id: m.residenceId }, { direction: 'IN' });
+      st.grmsRooms[m.residenceId] = {
+        residenceId: m.residenceId, dirty: info.dirty ?? null, occupied: info.occupied ?? null, dnd: info.dnd ?? null,
+        orderId: info.order_id || null, fetchedAt: isoNow(), error: null,
+      };
+    } catch {
+      /* snapshot stays as is; the next poll records the error */
     }
   }
 
