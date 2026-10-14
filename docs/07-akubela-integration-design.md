@@ -223,3 +223,24 @@ Lead 评审发现与处置：
 | L8 | 模拟器 `dump()` 含 PIN | 确认未经任何 REST 暴露 |
 
 验收证据：真实 UAT——令牌、房间/房型/订单/设备读取通过；入住出站请求真实发出并如实呈现平台 `20950005`。模拟器（Node 后端 + 真实浏览器）——UI 入住→GRMS `checked_in`；GRMS 自助退房→OPERA 退房且不回声；GRMS 置净→OPERA Clean；OPERA 置脏→GRMS dirty；空调控制 200；全部 15 个路由无控制台错误。
+
+---
+
+## 10. 设计修正（第 3 轮，2026-10-14）：OPERA 为主系统
+
+**问题（用户反馈）**：① 当 OPERA 对接第三方客控后，前台入住时应能选中第三方（GRMS）客控房；线上 Demo 无法选中。② 应以 OPERA 为主系统，把已有房态同步到 GRMS，现实现方向"相反"。
+
+**根因核对**
+| # | 现象 | 根因 |
+|---|---|---|
+| 1 | 线上 Demo「真实 UAT」不可选 | GitHub Pages 为纯静态站点，无服务端；Akubela 网关不返回 `Access-Control-Allow-Origin`（已用浏览器在 github.io 源实测 fetch 被拦截），且密钥不能放进静态页面 |
+| 2 | 入住排房找不到 101 客控房 | 101 种子为 Dirty，排房抽屉默认只列"就绪房"；且列表不标识哪些房间已接入 GRMS |
+| 3 | 方向相反 | `acceptGrmsClean` 默认开启 → GRMS 净/脏覆盖 OPERA；real 模式启动时从不把 OPERA 现有状态推送给 GRMS，只在之后的变更事件出站 |
+
+**修正方案**
+- 新增 `syncMode`：`opera-master`（默认）/ `bidirectional`。OPERA 为唯一真相源：预订、入住/退房、房务状态都由 OPERA 推向 GRMS；GRMS 回流仅限 GRMS 独有事实——DND、客人自助退房、告警。
+- 新增 `pushAll()` 与 `POST /api/integrations/akubela/push`：全量推送（所有映射房的脏/净、在住客→已入住订单、今日及未来已排房→待入住订单、已离店/取消的残留订单→关闭/删除）；`pushOnStart` 默认开启，real 与 sim 模式启动后都执行。
+- 入站轮询在 opera-master 下发现 GRMS dirty 与 OPERA 不一致时，不改 OPERA，而是自动入队一次纠正推送（每房 60s 节流）。
+- 线上 Demo 使用真实 UAT：静态页面可连接一个持有凭据的 Node 后端（`?backend=<URL>` 或页面"连接后端"），提供 GitHub Codespaces 一键后端（读取 Codespaces Secrets 中的凭据）。
+- 种子：101 房初始为已查（Inspected），并有一位今日到店预订（Smart, Room Demo，VIP），启动即预登记到 GRMS；排房抽屉标识「GRMS」客控房并支持仅看客控房。
+- 依据用户授权：假设 UAT 平台缺陷已修复，按文档契约直接对接 UAT（真实写入在平台修复前仍会返回 docs/08 中的错误码，作业日志如实呈现）。
