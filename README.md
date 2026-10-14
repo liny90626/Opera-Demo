@@ -98,6 +98,8 @@ curl -s 'localhost:3001/api/events?sinceSeq=0' | jq '.events[] | {seq, eventName
 
 **首次需要仓库管理员开启一次 Pages**：GitHub 仓库 → Settings → Pages → *Build and deployment* → Source 选 **Deploy from a branch** → Branch 选 **gh-pages / (root)** → Save。约 1 分钟后即可通过 <https://liny90626.github.io/Opera-Demo/> 访问。
 
+**在线演示连接真实 Akubela UAT**：Pages 版是静态页（浏览器内引擎），无法直连 Akubela（CORS/密钥）。先在 GitHub → Settings → Codespaces → Secrets 为本仓库添加 `AKUBELA_CLIENT_ID` / `AKUBELA_CLIENT_SECRET`，再打开 <https://codespaces.new/liny90626/Opera-Demo>（自动启动后端于 3001），在 Ports 面板把 3001 设为 Public 并复制地址，然后访问 `https://liny90626.github.io/Opera-Demo/?backend=<该地址>`（或用 Akubela 页的 "Connect backend" 按钮）。详见 [docs/05 §5b](docs/05-deployment-guide.md)。
+
 ---
 
 ## 5. 文档

@@ -29,10 +29,21 @@ npm run dev                 # 或 npm start / Docker（环境变量同名）
 - GRMS 同一 client 只允许一个有效令牌：新令牌会使旧令牌失效（`50107041`）。连接器会自动重新获取并重试；**不要让多个服务实例共用同一套凭据**。
 - 一键验收：`npm run akubela:verify`（只读）；`npm run akubela:verify -- --write`（含订单写入全流程，平台修复后用于回归）。
 
+### 2.1 在线演示（GitHub Pages）使用真实 UAT
+
+Pages 版是静态页面，无法直连 Akubela（网关无 CORS，且不能放密钥）。做法：在 GitHub Codespace 里跑本仓库后端，页面附着到它。
+1. GitHub → Settings → Codespaces → Secrets，为本仓库添加 `AKUBELA_CLIENT_ID` / `AKUBELA_CLIENT_SECRET`（自动注入为环境变量，后端即进入真实模式）。
+2. 打开 <https://codespaces.new/liny90626/Opera-Demo>，等后端启动，在 Ports 面板把 3001 设为 **Public**（devcontainer 暂不支持预设 visibility，唯一手动步骤），复制转发地址。
+3. 打开 `https://liny90626.github.io/Opera-Demo/?backend=<转发地址>`，或在本页用 **Connect backend** 按钮粘贴地址。
+详见 [docs/05 §5b](05-deployment-guide.md)。
+
 ## 3. 同步了什么
+
+**OPERA 是主系统**（默认 `syncMode = opera-master`）：房态、在住、订单以 OPERA 为准推送到 GRMS；GRMS 只回流它独有的事实（DND、客人自助退房、告警）。如需让 GRMS 的清扫结果回写 OPERA，在「设置」中切换为「双向（bidirectional）」并打开「接受 GRMS 置净」。
 
 | 在 OPERA 中… | GRMS 侧 |
 |---|---|
+| 连接/启动时（开关：启动全量推送）或点「推送 OPERA → GRMS（全量）」 | 全量推送 `pushAll`：所有已映射房间的房态、在住客人订单（`checked_in`）、已排房到店（`check_in`），并关闭 OPERA 已不存在的过期订单 |
 | 给今日/未来到店预订排房 | 创建「待入住」订单（`check_in`），GRMS 显示预计到达（开关：预登记） |
 | 入住 | 订单 → `checked_in`（无预登记则先创建）；可选：门锁 PIN、欢迎场景 |
 | 退房 / 提前离店 | 订单 → `checked_out`，房间置脏；可选：撤销 PIN、节能场景 |
@@ -43,8 +54,8 @@ npm run dev                 # 或 npm start / Docker（环境变量同名）
 
 | 在 GRMS 中…（轮询，默认 20s） | OPERA 侧 |
 |---|---|
-| 客房被清洁（dirty=false） | 房态 → Clean（30 秒内我方刚写入的脏房不回写，防抖） |
-| 房间置脏 | 房态 → Dirty |
+| 客房被清洁（dirty=false） | **仅双向模式**：房态 → Clean（30 秒内我方刚写入的脏房不回写，防抖）。OPERA 主模式下不改 OPERA，而是自动下发纠正推送（每房每 60 秒最多一次） |
+| 房间置脏 | **仅双向模式**：房态 → Dirty；OPERA 主模式同上，自动纠正 |
 | 勿扰（DND） | 在住房的服务状态 DND 置位/清除 |
 | 客人自助退房（订单 `checked_out`） | 自动办理退房（开关：接受 GRMS 退房） |
 | 告警（SOS/烟感/漏水/低电量） | 页面告警横幅 + 通知 |
@@ -53,22 +64,25 @@ npm run dev                 # 或 npm start / Docker（环境变量同名）
 
 ## 4. 页面功能（集成 › Akubela 客控云）
 
+- **主系统横幅**：「主系统 OPERA → 同步到 GRMS」，右侧「推送 OPERA → GRMS（全量）」按钮（`POST /api/integrations/akubela/push`）。
 - **连接卡片**：接口地址、Client ID（掩码）、令牌剩余时间、最近轮询、最近错误（错误码 + trace_id，可直接转给 Akubela 排查）；按钮：测试连接 / 立即轮询 / 对账。
 - **房间**：OPERA 房间 ↔ GRMS 房间映射（可下拉手工改），PMS 房态/在住/DND 与 GRMS dirty/occupied/dnd 对照，不一致标红。
 - **订单**：OPERA 预订 ↔ GRMS 订单关联与状态；GRMS 侧外部订单。
 - **作业**：每个出站动作（入住、退房、房态…）的状态、重试次数、错误与 trace_id，可手工重试。失败策略：网络/5xx/令牌问题指数退避重试（2→32s，最多 5 次）；确定性错误（如 `bind body`）立即失败。
 - **API 日志**：每次调用的命令、脱敏参数、耗时、结果码。
 - **设备与场景**：按房间列出 GRMS 设备与能力（在线状态、传感器读数），可开关、调温、切换模式（离线设备禁用）；场景列表可对房间触发。
-- **设置**：各同步开关、酒店时区、入住/退房默认时刻、轮询周期、订单来源、欢迎/节能场景 ID。
+- **设置**：同步模式（OPERA 主 / 双向）、启动全量推送、各同步开关、酒店时区、入住/退房默认时刻、轮询周期、订单来源、欢迎/节能场景 ID。
 - **模拟器**（仅 sim）：模拟 GRMS 侧事件——置净/置脏、DND、客人自助退房、告警、注入 UAT 故障。
 
-房间详情抽屉（任意房态页面点房号）也新增 GRMS 区块：映射、GRMS 状态、订单、设备。
+房间详情抽屉（任意房态页面点房号）也新增 GRMS 区块：映射、GRMS 状态、订单、设备，以及「推送此房到 GRMS」按钮。
+
+**前台排房**：前台 › 预抵 › 排房抽屉中，已映射 GRMS 的房间带 `GRMS` 徽标，可用「仅 GRMS 客控房」筛选；房态看板房号旁的 `G` 标记同义。演示用到店 *Smart, Room Demo* 已预排 OPERA 101（↔ GRMS 101，已检查）。
 
 ## 5. 演示脚本（模拟器模式，约 3 分钟）
 
 1. 前台 › 预抵：选一位房间已就绪的客人 → 入住 → 集成页「订单」出现 `checked_in`。
 2. 集成页「模拟器」：对该订单点"客人自助退房" → OPERA 预订自动退房、房间变脏（事件来源 AKUBELA）。
-3. 「模拟器」：将该房置净 → 约 30 秒后 OPERA 房态变 Clean。
+3. 「模拟器」：将该房置净 → OPERA 主模式下 OPERA 房态不变，「作业」出现纠正推送，GRMS 恢复为 OPERA 的房态（双向模式下则约 30 秒后 OPERA 变 Clean）。
 4. 房务看板把该房置 Dirty → 「作业」出现 ROOM_STATE 成功，「房间」中 GRMS dirty = 是。
 5. 「设备与场景」：开空调、调到 22℃；触发 "Welcome" 场景。
 6. 「模拟器」：注入 UAT 故障 → 再入住一位客人 → 「作业」显示 `20950005 api order bind body` 与 trace_id，体会真实环境的问题呈现。

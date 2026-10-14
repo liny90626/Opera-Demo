@@ -148,7 +148,18 @@ export interface GrmsAlarmRecord {
 // ───────────────────────────────────────────────────────────── integration state
 export type IntegrationMode = TransportKind | 'off';
 
+/**
+ * Which system is the source of truth.
+ * - opera-master (default): OPERA owns reservations and housekeeping status; GRMS is kept in line by pushing OPERA state
+ *   (startup push, change events, reconcile). Only GRMS-only facts flow back: DND, guest self check-out, alarms.
+ * - bidirectional: additionally accept clean/dirty changes made in GRMS (HyPanel / GRMS console).
+ */
+export type SyncMode = 'opera-master' | 'bidirectional';
+
 export interface AkubelaSettings {
+  syncMode: SyncMode;
+  /** Push the full OPERA state to GRMS whenever the connector starts (after master data is loaded). */
+  pushOnStart: boolean;
   /** Create a pending ("check_in") GRMS order when a room is assigned to an arrival. */
   preRegisterOnAssign: boolean;
   /** Push HK status (dirty/clean) to GRMS. */
@@ -172,9 +183,11 @@ export interface AkubelaSettings {
 }
 
 export const DEFAULT_SETTINGS: AkubelaSettings = {
+  syncMode: 'opera-master',
+  pushOnStart: true,
   preRegisterOnAssign: true,
   syncHkStatus: true,
-  acceptGrmsClean: true,
+  acceptGrmsClean: false, // only honoured when syncMode = 'bidirectional'
   acceptGrmsDnd: true,
   acceptGrmsCheckout: true,
   doorPinOnCheckIn: false,
@@ -295,6 +308,8 @@ export interface AkubelaState {
   apiLog: ApiCallLog[]; // newest first, capped 300
   alarms: AkubelaAlarm[]; // newest first, capped 100
   stats: { jobsSucceeded: number; jobsFailed: number; inboundApplied: number };
+  /** Last full OPERA → GRMS push (startup or manual). */
+  lastPushAt?: string | null;
   version: number;
 }
 
@@ -335,6 +350,12 @@ export interface AkubelaConnectorApi {
   poll(): Promise<void>;
   /** Compare all links/rooms and enqueue repair jobs; returns number of issues found. */
   reconcile(): Promise<number>;
+  /**
+   * Full OPERA → GRMS push for every mapped room: housekeeping dirty/clean, in-house guests as checked_in orders,
+   * today's assigned arrivals as pending orders (if preRegisterOnAssign), stale GRMS orders closed/cancelled.
+   * Enqueues jobs and returns their number; sets state.lastPushAt.
+   */
+  pushAll(): Promise<number>;
   /** Fetch room list + room types, rebuild auto mappings, test credentials. */
   refreshMasterData(): Promise<void>;
   retryJob(jobId: string): void;
@@ -365,6 +386,7 @@ export const AKUBELA_API = {
   settings: 'PUT /api/integrations/akubela/settings', // body Partial<AkubelaSettings>
   mapping: 'PUT /api/integrations/akubela/mapping', // body {roomId, residenceId|null}
   reconcile: 'POST /api/integrations/akubela/reconcile',
+  push: 'POST /api/integrations/akubela/push', // full OPERA → GRMS push, returns {jobs}
   poll: 'POST /api/integrations/akubela/poll',
   retry: 'POST /api/integrations/akubela/jobs/:id/retry',
   devices: 'GET /api/integrations/akubela/rooms/:roomId/devices',

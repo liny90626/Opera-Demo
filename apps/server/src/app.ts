@@ -187,6 +187,9 @@ export function createApp(opts: AppOptions = {}) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-app-key, x-hotelid, x-externalsystem, x-request-id, x-originating-application');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '600');
+    // Chrome Private Network Access: public Pages origin -> localhost backend
+    if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true');
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });

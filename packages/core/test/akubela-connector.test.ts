@@ -324,9 +324,9 @@ test('caps: jobs 200, apiLog 300; version bumps and onStateChange fires', async 
   void n;
 });
 
-test('reconcile: in-house guest without order → CHECK_IN; missing GRMS order → repair', async () => {
+test('reconcile (bidirectional): in-house guest without order → CHECK_IN; missing GRMS order → repair', async () => {
   const tr = fakeTransport();
-  const h = harness(tr);
+  const h = harness(tr, { settings: { syncMode: 'bidirectional' } });
   await h.conn.refreshMasterData();
   const inh = h.engine.snapshot().reservations.find((r) => r.status === 'InHouse')!;
   const issues = await h.conn.reconcile();
@@ -343,14 +343,14 @@ test('reconcile: in-house guest without order → CHECK_IN; missing GRMS order �
 });
 
 // ───────────────────────────────────────────── end-to-end with the GRMS simulator
-async function e2e() {
+async function e2e(settings?: Record<string, unknown>) {
   const engine0 = new PmsEngine(undefined, { businessDate: '2026-06-15', random: () => 0.99 });
   const clock = { t: T0 };
   const sim: GrmsSimulatorApi = createGrmsSimulator(engine0.snapshot(), { now: () => clock.t });
   const h = harness(sim);
   // re-create the sim against the harness engine's snapshot (same seed) and share the clock
   const sim2 = createGrmsSimulator(h.engine.snapshot(), { now: () => h.clock.t });
-  const h2 = harness(sim2);
+  const h2 = harness(sim2, { settings });
   await h2.conn.refreshMasterData();
   const orders = () => (sim2.dump() as any).orders as any[];
   const room = (no: string) => (sim2.dump() as any).rooms.find((r: any) => r.residence_no === no);
@@ -407,8 +407,8 @@ test('e2e: pre-register on assign, no-show cancels the order, room move', async 
   assert.equal(x.orders().find((o) => o.order_id === link.orderId), undefined);
 });
 
-test('e2e inbound: HK clean/dirty both ways (with 30s echo guard), DND, self check-out, alarms, external orders', async () => {
-  const x = await e2e();
+test('e2e inbound (bidirectional): HK clean/dirty both ways (with 30s echo guard), DND, self check-out, alarms, external orders', async () => {
+  const x = await e2e({ syncMode: 'bidirectional', acceptGrmsClean: true });
   const rid = (no: string) => x.conn.getState().residences.find((r) => r.residence_name === no)!.residence_id;
   // PMS Dirty → GRMS dirty
   const clean = roomViews(x.engine.snapshot()).find((v) => v.hkStatus === 'Inspected' && v.foStatus === 'Vacant' && !v.oooActive)!;
@@ -472,4 +472,100 @@ test('e2e: uat fault profile → per-room error snapshot, jobs fail with code an
   assert.ok(j.lastError!.traceId);
   x.conn.start();
   x.conn.stop();
+});
+
+// ───────────────────────────────────────────── OPERA is the master
+const hk = (x: { engine: PmsEngine }, id: string) => x.engine.snapshot().rooms.find((r) => r.id === id)!.hkStatus;
+const active = (x: { conn: AkubelaConnectorApi }) => x.conn.getState().jobs.filter((j) => j.status === 'PENDING' || j.status === 'RUNNING');
+
+test('pushAll: room states, in-house check-ins, pre-registrations, stale links; deduped', async () => {
+  const tr = fakeTransport();
+  const h = harness(tr);
+  await h.conn.refreshMasterData();
+  const snap = h.engine.snapshot();
+  const inh = snap.reservations.filter((r) => r.status === 'InHouse' && r.roomId);
+  const arr = snap.reservations.find((r) => r.status === 'Reserved' && r.roomId === '0101')!;
+  assert.ok(inh.length > 0 && arr);
+  // stale link: reservation no longer in house / assigned
+  const n = await h.conn.pushAll();
+  const jobs = h.conn.getState().jobs;
+  assert.equal(n, active(h).length);
+  assert.equal(jobs.filter((j) => j.action === 'ROOM_STATE').length, 97);
+  assert.ok(jobs.every((j) => /^Push: /.test(j.summary)));
+  const rs = (id: string) => jobs.find((j) => j.action === 'ROOM_STATE' && j.roomId === id)!;
+  assert.ok(rs('0101').summary.includes('clean'));
+  const dirtyRoom = snap.rooms.find((r) => r.hkStatus === 'Dirty')!;
+  assert.ok(rs(dirtyRoom.id).summary.includes('dirty'));
+  for (const r of inh) assert.ok(jobs.some((j) => j.action === 'CHECK_IN' && j.reservationId === r.id));
+  assert.ok(jobs.some((j) => j.action === 'PRE_REGISTER' && j.reservationId === arr.id));
+  assert.ok(h.conn.getState().lastPushAt);
+  assert.equal(await h.conn.pushAll(), 0, 'deduped against pending jobs');
+  await h.drain();
+  assert.ok(h.conn.getState().links.some((l) => l.reservationId === inh[0].id && l.state === 'checked_in'));
+  assert.ok(h.conn.getState().links.some((l) => l.reservationId === arr.id && l.state === 'check_in'));
+  assert.ok(tr.calls.some((c) => c.command === 'update_room_state' && c.param.residence_id === 'res-101' && c.param.dirty === false));
+  assert.equal(await h.conn.pushAll(), 97, 'room states are re-pushed unconditionally; no new order jobs');
+  await h.drain();
+  // stale link closing
+  const link = h.conn.getState().links.find((l) => l.reservationId === arr.id)!;
+  h.run({ type: 'unassignRoom', reservationId: arr.id } as Command);
+  await h.drain();
+  link.closed = false; link.state = 'check_in';
+  const co = inh[0];
+  h.conn.getState().links.find((l) => l.reservationId === co.id)!;
+  h.run({ type: 'checkOut', reservationId: co.id });
+  await h.drain();
+  const l2 = h.conn.getState().links.find((l) => l.reservationId === co.id)!;
+  l2.closed = false; l2.state = 'checked_in';
+  await h.conn.pushAll();
+  assert.ok(active(h).some((j) => j.action === 'CHECK_OUT' && j.reservationId === co.id));
+  assert.ok(active(h).some((j) => j.action === 'CANCEL_ORDER' && j.reservationId === arr.id));
+});
+
+test('opera-master inbound: GRMS dirty/clean never changes OPERA HK; corrective push is throttled; DND + self-checkout still inbound', async () => {
+  const x = await e2e();
+  const rid = (no: string) => x.conn.getState().residences.find((r) => r.residence_name === no)!.residence_id;
+  assert.equal(x.conn.getState().settings.syncMode, 'opera-master');
+  const clean = roomViews(x.engine.snapshot()).find((v) => v.hkStatus === 'Inspected' && v.foStatus === 'Vacant' && !v.oooActive && v.number !== '101')!;
+  x.sim.apply({ type: 'setRoomState', residenceId: rid(clean.number), dirty: true });
+  await x.conn.poll();
+  assert.equal(hk(x, clean.id), 'Inspected', 'OPERA untouched');
+  const fixes = () => x.conn.getState().jobs.filter((j) => j.roomId === clean.id && j.action === 'ROOM_STATE');
+  assert.equal(fixes().length, 1);
+  assert.match(fixes()[0].summary, /^Push: /);
+  await x.conn.poll();
+  assert.equal(fixes().length, 1, 'no duplicate while pending');
+  await x.drain();
+  assert.equal(x.room(clean.number).dirty, false, 'GRMS corrected');
+  x.sim.apply({ type: 'setRoomState', residenceId: rid(clean.number), dirty: true });
+  x.clock.t += 10_000;
+  await x.conn.poll();
+  assert.equal(fixes().length, 1, 'throttled within 60 s');
+  x.clock.t += 61_000;
+  await x.conn.poll();
+  assert.equal(fixes().length, 2);
+  await x.drain();
+  assert.equal(hk(x, clean.id), 'Inspected');
+  // DND + self check-out remain inbound
+  x.run({ type: 'checkIn', reservationId: 'R482996' });
+  await x.drain();
+  x.sim.apply({ type: 'setRoomState', residenceId: rid('202'), dnd: true });
+  await x.conn.poll();
+  assert.equal(x.engine.snapshot().rooms.find((r) => r.id === '0202')!.serviceStatus, 'DND');
+  const link = x.conn.getState().links.find((l) => l.reservationId === 'R482996')!;
+  x.sim.apply({ type: 'guestSelfCheckout', orderId: link.orderId });
+  await x.conn.poll();
+  assert.equal(x.engine.snapshot().reservations.find((r) => r.id === 'R482996')!.status, 'CheckedOut');
+});
+
+test('updateSettings: switching to opera-master triggers a push; reconcile in opera-master = push', async () => {
+  const tr = fakeTransport();
+  const h = harness(tr, { settings: { syncMode: 'bidirectional' } });
+  await h.conn.refreshMasterData();
+  assert.equal(active(h).length, 0);
+  h.conn.updateSettings({ syncMode: 'opera-master' });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(h.conn.getState().jobs.some((j) => j.action === 'ROOM_STATE'));
+  await h.drain();
+  assert.equal(await h.conn.reconcile(), 97);
 });

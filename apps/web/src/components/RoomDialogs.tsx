@@ -101,7 +101,7 @@ export function OutOfOrderDialog({ open, roomIds, defaultType = 'OOO', onClose, 
 
 /** GRMS (Akubela) block of the room drawer: mapping, GRMS flags, linked order, devices. */
 function GrmsSection({ v }: { v: RoomView }) {
-  const { akubela: st } = useStore();
+  const { akubela: st, akubelaCall, toast } = useStore();
   const t = useT();
   const [showDev, setShowDev] = useState(false);
   if (!st || st.mode === 'off') return null;
@@ -140,6 +140,24 @@ function GrmsSection({ v }: { v: RoomView }) {
               ['PIN', link ? <MaskedPin key="p" pin={link.pin} /> : '—'],
             ]}
           />
+          <div className="subtle" style={{ marginTop: 8, fontSize: 12 }}>
+            {st.settings.syncMode === 'bidirectional'
+              ? t('Bidirectional sync: GRMS changes may update OPERA.', '双向同步：GRMS 的变更可能回写 OPERA。')
+              : t('OPERA is the master: this room\'s state is pushed to GRMS.', 'OPERA 为主系统：本房状态会推送到 GRMS。')}
+          </div>
+          <div className="row-wrap" style={{ marginTop: 8 }}>
+            <Button
+              size="sm"
+              title={t('No per-room route: pushes all mapped rooms', '没有单房接口：将推送全部已映射房间')}
+              onClick={async () => {
+                const r = await akubelaCall('POST', '/push');
+                const n = (r.body as { jobs?: number } | undefined)?.jobs;
+                if (r.status < 400) toast('success', t(`${n ?? ''} jobs queued (all mapped rooms)`, `已排队 ${n ?? ''} 个作业（全部已映射房间）`));
+              }}
+            >
+              {t('Push OPERA → GRMS (all mapped rooms)', '推送 OPERA → GRMS（全部已映射房间）')}
+            </Button>
+          </div>
           <div style={{ marginTop: 10 }}>
             {showDev ? <DeviceList roomId={v.id} /> : <Button size="sm" onClick={() => setShowDev(true)}>{t('Show devices', '显示设备')}</Button>}
           </div>

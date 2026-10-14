@@ -12,6 +12,7 @@ import LogTab from './akubela/LogTab';
 import DevicesTab from './akubela/DevicesTab';
 import SettingsTab from './akubela/SettingsTab';
 import SimTab from './akubela/SimTab';
+import RealUatModal from './akubela/RealUatModal';
 import './Akubela.css';
 
 type TabKey = 'rooms' | 'orders' | 'jobs' | 'log' | 'devices' | 'settings' | 'sim';
@@ -20,6 +21,9 @@ function FlowStrip() {
   const t = useT();
   return (
     <div className="card aku-flow">
+      <div className="aku-master">
+        <b>{t('OPERA is the master → GRMS follows', '主系统 OPERA → 同步到 GRMS')}</b>
+      </div>
       <div className="aku-box">
         <b>OPERA PMS</b>
         <span>{t('check-in / out, room move, HK status', '入住/退房、换房、房务状态')}</span>
@@ -38,7 +42,7 @@ function FlowStrip() {
         <b>Akubela GRMS</b>
         <span>{t('orders · lock PIN · devices · scenes', '订单 · 门锁 PIN · 设备 · 场景')}</span>
       </div>
-      <div className="aku-back">↩ {t('polling brings back clean/dirty, DND, guest self check-out, alarms', '轮询回写：净/脏房、请勿打扰、自助退房、告警')}</div>
+      <div className="aku-back">↩ {t('polling brings back only GRMS-side facts: DND, guest self check-out, alarms (clean/dirty only in bidirectional mode)', '轮询仅回写 GRMS 侧事实：请勿打扰、自助退房、告警（净/脏房仅在双向模式下回写）')}</div>
     </div>
   );
 }
@@ -49,6 +53,8 @@ export default function Akubela() {
   const [tab, setTab] = useState<TabKey>('rooms');
   const [drawer, setDrawer] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [uatOpen, setUatOpen] = useState(false);
+  const { backendUrl, backendError, connectBackend } = useStore();
   const left = useCountdown(st?.token?.expiresAt);
 
   if (!st) {
@@ -78,6 +84,12 @@ export default function Akubela() {
   };
   const setMode = (m: IntegrationMode) => run('mode', 'POST', '/mode', { mode: m }, t('Mode changed', '模式已切换'));
   const isLocal = backendKind === 'local';
+  const pushAll = async () => {
+    setBusy('push');
+    const r = await akubelaCall('POST', '/push');
+    setBusy(null);
+    if (r.status < 400) toast('success', t(`${(r.body as { jobs?: number } | undefined)?.jobs ?? 0} jobs queued`, `已排队 ${(r.body as { jobs?: number } | undefined)?.jobs ?? 0} 个作业`));
+  };
   const recentAlarms = st.alarms.filter((a) => Date.now() - new Date(a.ts).getTime() < 10 * 60_000);
   const tabs: { key: TabKey; label: string; count?: number }[] = [
     { key: 'rooms', label: t('Rooms', '房间'), count: st.mappings.filter((m) => m.residenceId).length },
@@ -104,15 +116,15 @@ export default function Akubela() {
         actions={
           <div className="row" style={{ gap: 4 }} role="group" aria-label="mode">
             {(['off', 'sim', 'real'] as IntegrationMode[]).map((m) => {
-              const disabled = busy === 'mode' || (m === 'real' && isLocal);
+              const disabled = busy === 'mode';
               return (
                 <Button
                   key={m}
                   size="sm"
                   variant={st.mode === m ? 'primary' : 'secondary'}
                   disabled={disabled}
-                  title={m === 'real' && isLocal ? t('Requires the Node backend with credentials', '需要带凭据的 Node 后端') : undefined}
-                  onClick={() => st.mode !== m && setMode(m)}
+                  title={m === 'real' && isLocal ? t('Requires the Node backend with credentials – click for how', '需要带凭据的 Node 后端，点击查看方法') : undefined}
+                  onClick={() => (m === 'real' && isLocal ? setUatOpen(true) : st.mode !== m && setMode(m))}
                 >
                   {m === 'real' ? t('Real UAT', '真实 UAT') : m === 'sim' ? t('Simulator', '模拟器') : t('Off', '关闭')}
                 </Button>
@@ -139,6 +151,17 @@ export default function Akubela() {
       <div className="card card-pad aku-conn">
         <dl className="aku-kv">
           <div><dt>{t('Base URL', '接口地址')}</dt><dd className="mono">{st.baseUrl ?? (st.mode === 'sim' ? t('(in-browser simulator)', '（内置模拟器）') : '—')}</dd></div>
+          <div>
+            <dt>{t('Sync mode', '同步模式')}</dt>
+            <dd>
+              <span className={cx('badge', st.settings.syncMode === 'bidirectional' ? 'warn' : 'ok')}>
+                {st.settings.syncMode === 'bidirectional' ? t('Bidirectional', '双向同步') : t('OPERA master', 'OPERA 主系统')}
+              </span>
+            </dd>
+          </div>
+          <div><dt>{t('Last push', '最近推送')}</dt><dd>{fmtStamp(st.lastPushAt)}</dd></div>
+          {backendUrl && <div><dt>{t('Backend', '后端')}</dt><dd className="mono">{backendUrl} <a href="#/integration/akubela" onClick={(e) => { e.preventDefault(); connectBackend(null); }}>{t('disconnect', '断开')}</a></dd></div>}
+          {backendError && <div><dt>{t('Backend error', '后端错误')}</dt><dd style={{ color: 'var(--oc-danger)' }}>{backendError}</dd></div>}
           <div><dt>Client ID</dt><dd className="mono">{st.clientIdMasked ?? '—'}</dd></div>
           <div><dt>{t('Token expires in', '令牌剩余')}</dt><dd className="mono">{st.token ? left : '—'}</dd></div>
           <div><dt>{t('Last poll', '最近轮询')}</dt><dd>{fmtStamp(st.lastPollAt)}</dd></div>
@@ -157,6 +180,9 @@ export default function Akubela() {
           </div>
         </dl>
         <div className="row-wrap">
+          <Button size="sm" variant="primary" disabled={!!busy || st.mode === 'off'} onClick={pushAll}>
+            {busy === 'push' ? '…' : t('Push OPERA → GRMS (full)', '推送 OPERA → GRMS（全量）')}
+          </Button>
           <Button size="sm" disabled={!!busy || st.mode === 'off'} onClick={() => run('test', 'POST', '/test', undefined, t('Connection OK', '连接正常'))}>
             {busy === 'test' ? '…' : t('Test connection', '测试连接')}
           </Button>
@@ -183,6 +209,7 @@ export default function Akubela() {
           {curTab === 'sim' && <SimTab st={st} />}
         </>
       )}
+      <RealUatModal open={uatOpen} onClose={() => setUatOpen(false)} />
       <RoomDetailDrawer roomId={drawer} onClose={() => setDrawer(null)} />
     </div>
   );

@@ -21,6 +21,8 @@ function tileBg(v: RoomView, by: ViewBy) {
 
 function Tile({ v, by, sel, attName, onClick }: { v: RoomView; by: ViewBy; sel: boolean; attName?: string; onClick: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
   const recent = useIsRecent(v.id);
+  const { akubela } = useStore();
+  const grms = !!akubela && akubela.mode !== 'off' && akubela.mappings.some((m) => m.roomId === v.id && m.residenceId);
   const ooo = v.displayStatus === 'OutOfOrder' || v.displayStatus === 'OutOfService';
   const dark = by === 'hk' && v.displayStatus === 'Pickup';
   const tip = `${v.number} · ${v.roomType} · ${v.displayStatus}/${v.foStatus}/${v.resvStatus}${v.inHouse ? ` · ${v.inHouse.guestName} → ${v.inHouse.departure}` : ''} · ${v.lastChangedBy}`;
@@ -41,6 +43,9 @@ function Tile({ v, by, sel, attName, onClick }: { v: RoomView; by: ViewBy; sel: 
         {v.queued && '⏳'}
         {v.inHouse?.vip && '⚑'}
       </span>
+      {grms && (
+        <span title="Akubela GRMS" style={{ position: 'absolute', right: 4, bottom: 3, fontSize: 9, fontWeight: 700, lineHeight: 1, padding: '1px 3px', borderRadius: 3, background: 'rgba(255,255,255,.85)', color: '#8a5a00' }}>G</span>
+      )}
       {attName && <span className="at">{initials(attName)}</span>}
     </button>
   );

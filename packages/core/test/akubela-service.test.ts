@@ -89,6 +89,11 @@ test('rest: routes and validation', async () => {
 
     assert.equal((await call(svc, 'POST', `${A}/poll`)).status, 200);
     assert.equal((await call(svc, 'POST', `${A}/reconcile`)).status, 200);
+    const push = await call(svc, 'POST', `${A}/push`);
+    assert.equal(push.status, 200);
+    assert.equal(typeof (push.body as { jobs: number }).jobs, 'number');
+    assert.equal((await call(svc, 'PUT', `${A}/settings`, { syncMode: 'bogus' })).status, 400);
+    assert.equal((await call(svc, 'PUT', `${A}/settings`, { syncMode: 'bidirectional', pushOnStart: false })).status, 200);
     assert.equal((await call(svc, 'POST', `${A}/jobs/nope/retry`)).status, 404);
     assert.equal((await call(svc, 'GET', `${A}/scenes`)).status, 200);
     assert.equal((await call(svc, 'POST', `${A}/devices/control`, { device_id: 'd' })).status, 400);
@@ -101,6 +106,7 @@ test('rest: routes and validation', async () => {
     await call(svc, 'POST', `${A}/mode`, { mode: 'off' });
     assert.equal((await call(svc, 'POST', `${A}/sim`, { type: 'setFaults', profile: 'none' })).status, 409);
     assert.equal((await call(svc, 'POST', `${A}/poll`)).status, 409);
+    assert.equal((await call(svc, 'POST', `${A}/push`)).status, 409);
     assert.equal((await call(svc, 'GET', `${A}/state`)).status, 200);
   } finally {
     svc.dispose();
@@ -122,6 +128,27 @@ test('rest: GRMS errors map to 502', async () => {
     const sc = await call(svc, 'GET', `${A}/scenes`);
     assert.equal(sc.status, 502);
     assert.deepEqual(sc.body, { code: 20950001, message: 'bind body', traceId: 'tr-9' });
+  } finally {
+    svc.dispose();
+  }
+});
+
+test('service: pushes OPERA state to the simulator on start (room states, in-house orders, arrival pre-registered)', async () => {
+  const pms = mkPms();
+  const svc = createAkubelaService({ pms, realTransportFactory: null, initialMode: 'sim', autoStart: false });
+  try {
+    for (let i = 0; i < 200 && !svc.state().lastPushAt; i++) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 100));
+    const snap = pms.snapshot();
+    const dump = svc.simulator()!.dump() as any;
+    for (const room of snap.rooms) {
+      const g = dump.rooms.find((r: any) => r.residence_no === room.number);
+      assert.equal(g.dirty, room.hkStatus === 'Dirty' || room.hkStatus === 'Pickup', `room ${room.number}`);
+    }
+    for (const r of snap.reservations.filter((x) => x.status === 'InHouse')) {
+      assert.ok(dump.orders.some((o: any) => o.residence_no === snap.rooms.find((m) => m.id === r.roomId)!.number && o.order_state === 'checked_in'), r.guestName);
+    }
+    assert.ok(dump.orders.some((o: any) => o.residence_no === '101' && o.order_state === 'check_in'), 'room 101 pre-registered ' + JSON.stringify(dump.orders.map((o: any) => [o.residence_no, o.order_state])) + JSON.stringify(svc.state().jobs.filter((j) => j.status !== 'SUCCEEDED').map((j) => [j.summary, j.status, j.lastError])));
   } finally {
     svc.dispose();
   }

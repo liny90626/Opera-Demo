@@ -11,7 +11,7 @@ import {
   type RoomView,
   type Snapshot,
 } from '@opera-demo/core';
-import { createBackend, type AkubelaResult, type Backend, type ConnectionState, type OhipResult } from './backend';
+import { BACKEND_URL_KEY, configuredBackendUrl, createBackend, lastBackendError, normalizeBackendUrl, type AkubelaResult, type Backend, type ConnectionState, type OhipResult } from './backend';
 import { LangContext, type Lang } from './i18n';
 
 export type Role = 'frontdesk' | 'hk' | 'attendant' | 'integration';
@@ -41,6 +41,12 @@ interface StoreValue {
   views: RoomView[];
   viewById: Map<string, RoomView>;
   backendKind: 'http' | 'local';
+  /** Remote Node backend URL in use (null = same-origin server or in-browser engine). */
+  backendUrl: string | null;
+  /** Why a configured remote backend could not be used (null = no error). */
+  backendError: string | null;
+  /** Attach to a remote backend (https?:// URL) or detach (null); saves to localStorage and reloads the page. */
+  connectBackend: (url: string | null) => void;
   conn: ConnectionState;
   exec: (cmd: Command, opts?: ExecOptions) => Promise<CommandResult>;
   ohip: (req: OhipRequest) => Promise<OhipResult>;
@@ -89,7 +95,23 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
   const [remotePulse, setRemotePulse] = useState(0);
   const [recentRooms, setRecentRooms] = useState<Record<string, number>>({});
   const [akubela, setAkubela] = useState<AkubelaState | null>(null);
+  const [backendError, setBackendError] = useState<string | null>(null);
   const toastId = useRef(0);
+
+  const connectBackend = useCallback((url: string | null) => {
+    const norm = url === null ? null : normalizeBackendUrl(url);
+    if (url !== null && !norm) throw new Error('Backend URL must start with http:// or https://');
+    try {
+      if (norm) localStorage.setItem(BACKEND_URL_KEY, norm);
+      else localStorage.removeItem(BACKEND_URL_KEY);
+    } catch {
+      /* storage unavailable: the ?backend= parameter below still works */
+    }
+    const u = new URL(location.href);
+    if (norm) u.searchParams.set('backend', norm);
+    else u.searchParams.delete('backend');
+    location.replace(u.toString());
+  }, []);
 
   const toast = useCallback((kind: ToastMsg['kind'], text: string) => {
     const id = ++toastId.current;
@@ -107,6 +129,7 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
       const s = await b.load();
       if (cancelled) return;
       setBackend(b);
+      setBackendError(lastBackendError);
       setSnapshot(s);
       const unsubAku = b.subscribeAkubela((st) => setAkubela(st));
       const unsubMain = b.subscribe(
@@ -229,6 +252,9 @@ export function StoreProvider({ children, fallback }: { children: ReactNode; fal
     views,
     viewById,
     backendKind: backend.kind,
+    backendUrl: backend.kind === 'http' ? configuredBackendUrl() : null,
+    backendError,
+    connectBackend,
     conn,
     exec,
     ohip,

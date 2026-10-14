@@ -287,14 +287,15 @@ export function createSeed(opts: SeedOptions = {}): Snapshot {
   if (showRoom) { showRoom.conditionCode = 'SHW'; showRoom.hkStatus = 'Inspected'; }
 
   // 9) Room 101 (floor 1): the real room in the Akubela GRMS UAT project "TMG-环境" (auto-mapped by room number).
-  //    Added after the random allocation so all other seeded data stays identical. Vacant & Dirty like the GRMS room.
+  //    Added after the random allocation so all other seeded data stays identical. OPERA is the master system: the room
+  //    starts Inspected (ready) with a guest arriving today, and the connector pushes this state to GRMS.
   rooms.unshift({
     id: '0101',
     number: '101',
     floor: 1,
     roomType: 'SK',
     features: ['NS', 'GRMS'],
-    hkStatus: 'Dirty',
+    hkStatus: 'Inspected',
     outOfOrder: null,
     hkOccupancy: null,
     hkPersons: null,
@@ -306,6 +307,8 @@ export function createSeed(opts: SeedOptions = {}): Snapshot {
     lastStatusChange: ts(7, 0),
     lastChangedBy: 'NIGHT AUDIT',
   });
+
+  newResv({ arrival: D, departure: addDays(D, 2), roomType: 'SK', status: 'Reserved', roomId: '0101', guestName: 'Smart, Room Demo', vip: 'V1', eta: '15:00', specials: ['Smart room demo (Akubela GRMS)'], email: 'guest@opera-demo.local', phone: '+8613800000000' });
 
   const hotel = {
     hotelId: 'DEMO1',

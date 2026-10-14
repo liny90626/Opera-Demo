@@ -47,11 +47,28 @@ export default function SettingsTab({ st }: { st: AkubelaState }) {
   );
   return (
     <div className="card card-pad col" style={{ gap: 14 }}>
+      <div className="col" style={{ gap: 6 }}>
+        <b>{t('Sync mode', '同步模式')}</b>
+        {(['opera-master', 'bidirectional'] as const).map((m) => (
+          <label key={m} className="check" style={{ alignItems: 'flex-start' }}>
+            <input type="radio" name="syncMode" checked={draft.syncMode === m} onChange={() => { set('syncMode', m); if (m === 'opera-master') set('acceptGrmsClean', false); }} />
+            <span>
+              <b>{m === 'opera-master' ? t('OPERA master (recommended)', 'OPERA 主系统（推荐）') : t('Bidirectional', '双向同步')}</b>
+              <div className="subtle" style={{ fontSize: 12 }}>
+                {m === 'opera-master'
+                  ? t('OPERA owns room status and reservations and pushes them to GRMS. Only DND, guest self check-out and alarms come back.', 'OPERA 掌管房态与预订并推送到 GRMS；只有请勿打扰、自助退房与告警会回写。')
+                  : t('GRMS clean/dirty changes may also overwrite the OPERA housekeeping status.', 'GRMS 的净/脏房变更也可以覆盖 OPERA 房务状态。')}
+              </div>
+            </span>
+          </label>
+        ))}
+        <Checkbox checked={draft.pushOnStart} onChange={(v) => set('pushOnStart', v)} label={<b>{t('Push OPERA state to GRMS on start', '启动时推送 OPERA 状态到 GRMS')}</b>} />
+      </div>
       <div className="aku-settings">
         {toggles.map((x) => (
           <div key={x.k} className="aku-setting">
-            <Checkbox checked={draft[x.k] as boolean} onChange={(v) => set(x.k, v as never)} label={<b>{t(x.en, x.zh)}</b>} />
-            <div className="subtle" style={{ fontSize: 12, marginLeft: 24 }}>{t(x.dEn, x.dZh)}</div>
+            <Checkbox disabled={x.k === 'acceptGrmsClean' && draft.syncMode !== 'bidirectional'} checked={draft[x.k] as boolean} onChange={(v) => set(x.k, v as never)} label={<b>{t(x.en, x.zh)}</b>} />
+            <div className="subtle" style={{ fontSize: 12, marginLeft: 24 }}>{t(x.dEn, x.dZh)}{x.k === 'acceptGrmsClean' && draft.syncMode !== 'bidirectional' ? ' ' + t('(only in bidirectional mode)', '（仅双向模式可用）') : ''}</div>
           </div>
         ))}
       </div>
