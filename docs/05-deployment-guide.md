@@ -198,11 +198,28 @@ volumes:
 ## 方案 5：GitHub Codespaces（形态 B，零服务器的临时远程环境）
 
 仓库已带 `.devcontainer/devcontainer.json`：
-1. GitHub 仓库页 → **Code → Codespaces → Create codespace on main**。
-2. 环境会自动 `npm ci && npm run build` 并启动后端（3001 端口）。
-3. 在 **Ports** 面板把 3001 的 Visibility 改为 **Public**，即可把链接发给他人访问。
+1. GitHub 仓库页 → **Code → Codespaces → Create codespace on main**（或直接打开 <https://codespaces.new/liny90626/Opera-Demo>）。
+2. 首次创建自动 `npm ci && npm run build`；每次 Codespace 启动（`postStartCommand`）都会在后台自动启动后端（3001 端口，日志 `/tmp/opera-demo/server.log`），并转发 3001。
+3. 在 **Ports** 面板把 3001 的 Visibility 改为 **Public**，即可把链接发给他人访问（见下节，这也是在线演示接入所必需的一步）。
 
-> Codespaces 有免费额度且闲置会自动休眠，适合临时演示。
+> Codespaces 有免费额度且闲置会自动休眠（再次打开会自动重启后端），适合临时演示。
+
+---
+
+## 5b. 在线演示连接真实 UAT
+
+GitHub Pages 上的在线演示是纯静态页面（引擎跑在浏览器里）。它**不能直接调用 Akubela 网关**（网关不返回 CORS 头，浏览器会拦截），也**不能存放密钥**。解决办法：让页面附着到一个持有凭据的 Node 后端（本仓库的 `apps/server`），由后端去连 UAT。
+
+**一次性准备**：GitHub → Settings → Codespaces → **Secrets** → New secret，添加 `AKUBELA_CLIENT_ID`、`AKUBELA_CLIENT_SECRET`，并在 *Repository access* 中勾选本仓库（Codespaces 会把它们自动注入为环境变量；服务端检测到两者即默认进入"真实 UAT"模式，无需 `.env`）。
+
+**每次演示**：
+1. 打开 <https://codespaces.new/liny90626/Opera-Demo>，创建/恢复 Codespace，等待 `postStartCommand` 启动后端（终端或 Ports 面板出现 3001）。
+2. 在 **Ports** 面板里把 3001 的 Visibility 设为 **Public**（`devcontainer.json` 的 `portsAttributes` 目前不支持设置 visibility，这是唯一需要手动的一步）。
+3. 复制 3001 的转发地址，形如 `https://<codespace>-3001.app.github.dev`（可 `curl <地址>/api/health` 自测）。
+4. 打开 `https://liny90626.github.io/Opera-Demo/?backend=<该地址>`；或在页面 **集成 › Akubela 客控云** 点 **Connect backend** 粘贴地址（会保存到浏览器 localStorage `opera-demo/backend-url`，下次自动使用；清除即恢复浏览器内引擎）。
+5. 页面右上角显示"后端：Node 服务"即成功；若地址不可达（3 秒超时），会自动回退到浏览器内引擎并提示原因。
+
+说明：服务端对跨域 UI 已开放 CORS（含 `/api/stream` SSE 与 PUT/POST JSON 预检）；后端是共享状态，凭据始终只在服务端。同一套 Akubela 凭据只允许一个服务实例持有有效令牌，请勿同时在多处运行。
 
 ---
 
@@ -213,6 +230,7 @@ volumes:
 | 构建时 `VITE_BACKEND=local`（`npm run build:pages`） | 固定使用浏览器内引擎 |
 | 默认构建（`npm run build`） | 先探测同源 `/api/health`，可达则连 Node 后端，不可达自动回退浏览器内引擎 |
 | URL 参数 `?backend=local` / `?backend=http` | 临时强制切换（如 `https://host/?backend=local#/`） |
+| URL 参数 `?backend=https://host` 或 localStorage `opera-demo/backend-url` | 附着到远程 Node 后端（先探测 `/api/health`，3 秒超时，失败回退浏览器内引擎），见 5b |
 
 页面右上角会显示当前形态：「后端：Node 服务」或「后端：浏览器内引擎」。
 

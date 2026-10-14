@@ -229,6 +229,26 @@ const SCENARIOS: Scenario[] = [
     ],
     tip: ['Reset demo data restores the seed data and today’s business date at any time.', '「重置演示数据」可随时恢复种子数据与今天的业务日期。'],
   },
+  {
+    id: 's12',
+    title: ['S12 Akubela GRMS (OPERA is the master)', 'S12 Akubela 客控云（OPERA 主系统）'],
+    minutes: 6,
+    goal: [
+      'Show that OPERA is the master: its room and reservation state is pushed to Akubela GRMS, and a check-in creates a GRMS order.',
+      '展示 OPERA 是主系统：房态与预订推送到 Akubela 客控云，办理入住会在 GRMS 创建订单。',
+    ],
+    prep: ['Use the in-browser Simulator mode (default), or Real UAT through a backend.', '使用浏览器内置模拟器模式（默认），或通过后端连接真实 UAT。'],
+    steps: [
+      { text: ['Open the Akubela page: the flow strip reads "OPERA is the master → GRMS follows". With push on start enabled, the Sync mode badge and Last push time show that OPERA state was already pushed; click Push OPERA → GRMS (full) to push again.', '打开 Akubela 页面：流程条显示“主系统 OPERA → 同步到 GRMS”。启用“启动时推送”后，同步模式与最近推送时间表明 OPERA 状态已推送；点击“推送 OPERA → GRMS（全量）”可再次推送。'], link: { to: '/integration/akubela', label: ['Akubela GRMS', 'Akubela 客控云'] } },
+      { text: ['On Arrivals, check in "Smart, Room Demo" (already assigned to room 101, Inspected). Open Assign Room to see GRMS badges and the GRMS rooms only chip.', '在预抵页为“Smart, Room Demo”办理入住（已排 101 房，Inspected）。打开排房抽屉可看到 GRMS 标记与“仅 GRMS 客控房”筛选。'], link: { to: R.arrivals, label: ['Arrivals', '预抵'] } },
+      { text: ['Back on the Akubela page, the Orders tab shows the GRMS order for room 101 in state checked_in.', '回到 Akubela 页面，订单页显示 101 房的 GRMS 订单，状态 checked_in。'], link: { to: '/integration/akubela', label: ['Akubela GRMS', 'Akubela 客控云'] } },
+      { text: ['Check the guest out from In House: the GRMS order becomes checked_out and room 101 turns dirty in GRMS.', '在在住页为该客人退房：GRMS 订单变为 checked_out，101 房在 GRMS 中变为脏房。'], link: { to: R.inhouse, label: ['In House', '在住'] } },
+      { text: ['Real UAT online: on the static demo click Real UAT, enter the public URL of a running backend (for example a GitHub Codespace on port 5300 made public) and Connect. The browser cannot call the Akubela gateway directly (no CORS, and secrets cannot live in a static page).', '在线使用真实 UAT：在静态演示站点点击“真实 UAT”，输入已运行后端的公网地址（例如设为公开的 Codespaces 5300 端口）并连接。浏览器无法直接调用 Akubela 网关（无 CORS，密钥也不能放在静态页面中）。'] },
+    ],
+    expect: [
+      ['Room state flows OPERA → GRMS; GRMS only sends back DND, self check-out and alarms unless Bidirectional is selected in Settings.', '房态从 OPERA 流向 GRMS；除非在设置中选择双向同步，GRMS 只回写请勿打扰、自助退房与告警。'],
+    ],
+  },
 ];
 
 const STATUS_NOTES: Record<string, B> = {

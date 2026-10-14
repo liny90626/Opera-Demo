@@ -32,11 +32,15 @@ export default function RoomsTab({ st, onOpen }: { st: AkubelaState; onOpen: (ro
   const taken = new Set(st.mappings.map((m) => m.residenceId).filter(Boolean));
   const resOptions = (cur: string | null) => st.residences.filter((r) => r.residence_id === cur || !taken.has(r.residence_id)).map((r) => ({ value: r.residence_id, label: `${r.residence_name} · ${r.building_name}/${r.floor_name}` }));
 
+  const mismatch = (r: Row) => {
+    const p = pmsFlags(r.v);
+    return !!r.grms && (r.grms.dirty !== p.dirty || r.grms.occupied !== p.occupied || r.grms.dnd !== p.dnd);
+  };
   const cols: Column<Row>[] = [
-    { key: 'room', header: t('OPERA Room', 'OPERA 房间'), sortValue: (r) => r.v.number, render: (r) => <b>{roomNo(r.v.id)}</b>, width: 90 },
+    { key: 'room', header: t('OPERA (master) Room', 'OPERA（主）房间'), sortValue: (r) => r.v.number, render: (r) => <b>{roomNo(r.v.id)}</b>, width: 90 },
     {
       key: 'map',
-      header: t('GRMS Residence', 'GRMS 房间'),
+      header: t('→ GRMS Residence', '→ GRMS 房间'),
       render: (r) => (
         <span onClick={(e) => e.stopPropagation()} className="row" style={{ gap: 6 }}>
           <Select
@@ -49,9 +53,9 @@ export default function RoomsTab({ st, onOpen }: { st: AkubelaState; onOpen: (ro
         </span>
       ),
     },
-    { key: 'hk', header: 'PMS HK', render: (r) => r.v.hkStatus },
-    { key: 'fo', header: 'PMS FO', render: (r) => r.v.foStatus },
-    { key: 'pdnd', header: 'PMS DND', render: (r) => <Flag v={pmsFlags(r.v).dnd} /> },
+    { key: 'hk', header: 'OPERA HK', render: (r) => r.v.hkStatus },
+    { key: 'fo', header: 'OPERA FO', render: (r) => r.v.foStatus },
+    { key: 'pdnd', header: 'OPERA DND', render: (r) => <Flag v={pmsFlags(r.v).dnd} /> },
     {
       key: 'gd',
       header: 'GRMS dirty',
@@ -67,6 +71,7 @@ export default function RoomsTab({ st, onOpen }: { st: AkubelaState; onOpen: (ro
       header: 'GRMS DND',
       render: (r) => <Flag v={r.grms?.dnd} bad={r.grms?.dnd != null && r.grms.dnd !== pmsFlags(r.v).dnd} />,
     },
+    { key: 'sync', header: t('Sync', '同步'), render: (r) => (r.grms && mismatch(r) ? <span className="badge warn">→ {t('push', '推送')}</span> : r.grms ? <span className="subtle">✓</span> : null) },
     { key: 'err', header: t('Error', '错误'), render: (r) => <ErrBadge e={r.grms?.error} /> },
   ];
 
@@ -87,7 +92,7 @@ export default function RoomsTab({ st, onOpen }: { st: AkubelaState; onOpen: (ro
         <>
           <Checkbox checked={mappedOnly} onChange={setMappedOnly} label={`${t('Mapped only', '仅显示已映射')} (${mappedCount}/${st.mappings.length})`} />
           <TextInput value={q} onChange={setQ} placeholder={t('Room no.', '房号')} className="aku-q" />
-          <span className="subtle">{t('Red = PMS and GRMS disagree', '红色 = PMS 与 GRMS 不一致')}</span>
+          <span className="subtle">{t('Red = GRMS differs from OPERA (the master) – will be pushed', '红色 = GRMS 与主系统 OPERA 不一致，将被推送覆盖')}</span>
         </>
       }
     />

@@ -29,6 +29,14 @@ npm run dev                 # 或 npm start / Docker（环境变量同名）
 - GRMS 同一 client 只允许一个有效令牌：新令牌会使旧令牌失效（`50107041`）。连接器会自动重新获取并重试；**不要让多个服务实例共用同一套凭据**。
 - 一键验收：`npm run akubela:verify`（只读）；`npm run akubela:verify -- --write`（含订单写入全流程，平台修复后用于回归）。
 
+### 2.1 在线演示（GitHub Pages）使用真实 UAT
+
+Pages 版是静态页面，无法直连 Akubela（网关无 CORS，且不能放密钥）。做法：在 GitHub Codespace 里跑本仓库后端，页面附着到它。
+1. GitHub → Settings → Codespaces → Secrets，为本仓库添加 `AKUBELA_CLIENT_ID` / `AKUBELA_CLIENT_SECRET`（自动注入为环境变量，后端即进入真实模式）。
+2. 打开 <https://codespaces.new/liny90626/Opera-Demo>，等后端启动，在 Ports 面板把 3001 设为 **Public**（devcontainer 暂不支持预设 visibility，唯一手动步骤），复制转发地址。
+3. 打开 `https://liny90626.github.io/Opera-Demo/?backend=<转发地址>`，或在本页用 **Connect backend** 按钮粘贴地址。
+详见 [docs/05 §5b](05-deployment-guide.md)。
+
 ## 3. 同步了什么
 
 | 在 OPERA 中… | GRMS 侧 |

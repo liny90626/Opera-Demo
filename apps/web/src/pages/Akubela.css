@@ -1,4 +1,5 @@
 .aku-flow { display: flex; align-items: stretch; gap: 8px; padding: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.aku-master { flex-basis: 100%; font-size: 13px; color: #0b5a6b; }
 .aku-box { flex: 1 1 160px; border: 1px solid var(--oc-border-strong); border-radius: 6px; padding: 8px 12px; background: #fafafa; display: flex; flex-direction: column; gap: 2px; font-size: 12px; min-width: 0; }
 .aku-box b { font-size: 14px; }
 .aku-box.core { background: linear-gradient(180deg, #e7f3f6, #d4eaf0); border-color: #7fb7c4; }

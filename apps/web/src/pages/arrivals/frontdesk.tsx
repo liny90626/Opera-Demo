@@ -40,7 +40,8 @@ export function blockedReason(
 
 export function AssignRoomDrawer({ resv, onClose }: { resv: Reservation | null; onClose: () => void }) {
   const t = useT();
-  const { snapshot, views, exec } = useStore();
+  const { snapshot, views, exec, akubela } = useStore();
+  const [grmsOnly, setGrmsOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>(''); // '' = reserved type
   const [allTypes, setAllTypes] = useState(false);
   const [notReady, setNotReady] = useState(false);
@@ -52,6 +53,12 @@ export function AssignRoomDrawer({ resv, onClose }: { resv: Reservation | null; 
   // always read the live reservation
   const live = resv ? snapshot.reservations.find((x) => x.id === resv.id) ?? resv : null;
 
+  const grmsMap = useMemo(() => {
+    const m = new Map<string, string>();
+    if (akubela && akubela.mode !== 'off') for (const x of akubela.mappings) if (x.residenceId) m.set(x.roomId, x.residenceName ?? x.residenceId);
+    return m;
+  }, [akubela]);
+
   const cands: Candidate[] = useMemo(() => {
     if (!live) return [];
     const snap = { reservations: snapshot.reservations, conditions: snapshot.conditions, businessDate: snapshot.hotel.businessDate };
@@ -60,8 +67,9 @@ export function AssignRoomDrawer({ resv, onClose }: { resv: Reservation | null; 
       .filter((v) => allTypes || v.roomType === wantType)
       .map((v) => ({ room: v, ready: isRoomReady(snapshot, v), blocked: blockedReason(v, live, snap, t), current: live.roomId === v.id }))
       .filter((c) => notReady || c.ready || c.current || c.blocked)
-      .sort((a, b) => Number(!!a.blocked) - Number(!!b.blocked) || Number(b.ready) - Number(a.ready) || a.room.number.localeCompare(b.room.number, undefined, { numeric: true }));
-  }, [live, views, snapshot, typeFilter, allTypes, notReady, t]);
+      .filter((c) => !grmsOnly || grmsMap.has(c.room.id))
+      .sort((a, b) => Number(!!a.blocked) - Number(!!b.blocked) || Number(grmsMap.has(b.room.id)) - Number(grmsMap.has(a.room.id)) || Number(b.ready) - Number(a.ready) || a.room.number.localeCompare(b.room.number, undefined, { numeric: true }));
+  }, [live, views, snapshot, typeFilter, allTypes, notReady, grmsOnly, grmsMap, t]);
 
   if (!live) return null;
   const selected = cands.find((c) => c.room.id === sel);
@@ -117,6 +125,11 @@ export function AssignRoomDrawer({ resv, onClose }: { resv: Reservation | null; 
           </Field>
           <Checkbox checked={allTypes} onChange={setAllTypes} label={t('Show all room types', '显示所有房型')} />
           <Checkbox checked={notReady} onChange={setNotReady} label={t('Include not-ready rooms', '包含未就绪房')} />
+          {grmsMap.size > 0 && (
+            <button type="button" className={`chip${grmsOnly ? ' on' : ''}`} onClick={() => setGrmsOnly((x) => !x)}>
+              {t('GRMS rooms only', '仅 GRMS 客控房')}
+            </button>
+          )}
         </div>
         {live.roomId && (
           <div className="muted" style={{ marginBottom: 8 }}>
@@ -150,6 +163,9 @@ export function AssignRoomDrawer({ resv, onClose }: { resv: Reservation | null; 
                     <td>
                       <input type="radio" checked={sel === v.id} disabled={!!c.blocked} readOnly style={{ marginRight: 6 }} />
                       <b>{v.number}</b>
+                      {grmsMap.has(v.id) && (
+                        <span className="badge info" style={{ marginLeft: 6 }} title={t(`Akubela GRMS room → ${grmsMap.get(v.id)}`, `Akubela 客控房 → ${grmsMap.get(v.id)}`)}>GRMS</span>
+                      )}
                     </td>
                     <td>{v.roomType}</td>
                     <td>{v.floor}</td>
