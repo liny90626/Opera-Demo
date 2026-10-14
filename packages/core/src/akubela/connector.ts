@@ -37,6 +37,7 @@ const CAP_EXTERNAL = 50;
 const BACKOFF_MS = [2000, 4000, 8000, 16000, 32000];
 const MASTER_TTL_MS = 5 * 60_000;
 const DIRTY_ECHO_MS = 30_000;
+const CORRECT_THROTTLE_MS = 60_000;
 const ORDER_PAGE = 50;
 const ORDER_MISSING = 20017008;
 const REDACT_KEYS = new Set(['id_card', 'passport', 'phone', 'email', 'pin_code', 'pin', 'client_secret', 'access_token', 'refresh_token']);
@@ -158,6 +159,7 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
   let alarmSeq = 0;
   const payloads = new Map<string, Payload>();
   const lastDirtyWrite = new Map<string, number>(); // roomId → ms of our last dirty=true write
+  const lastCorrect = new Map<string, number>(); // roomId → ms of our last auto-correct ROOM_STATE push
   const userMapped = new Set<string>(); // rooms mapped via setMapping() in this process (beat deps.roomMap)
   const seenEvents: string[] = [];
   const seenEventSet = new Set<string>();
@@ -691,7 +693,16 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
     const room = roomById(roomId);
     if (!room) return;
     const S = st.settings;
-    if (S.acceptGrmsClean && !pendingRoomWork(roomId)) {
+    const operaDirty = room.hkStatus === 'Dirty' || room.hkStatus === 'Pickup';
+    if (S.syncMode === 'opera-master') {
+      // OPERA is the master: never take housekeeping from GRMS; push a correction instead (throttled per room)
+      if (S.syncHkStatus && info.dirty !== undefined && info.dirty !== null && info.dirty !== operaDirty && !pendingRoomWork(roomId)
+        && !st.jobs.some((j) => j.roomId === roomId && j.action === 'ROOM_STATE' && (j.status === 'PENDING' || j.status === 'RUNNING'))
+        && nowMs() - (lastCorrect.get(roomId) ?? -Infinity) >= CORRECT_THROTTLE_MS) {
+        lastCorrect.set(roomId, nowMs());
+        enqueue({ key: `room:${roomId}`, action: 'ROOM_STATE', roomId, payload: { dirty: operaDirty }, summary: `Push: room ${room.number} → ${operaDirty ? 'dirty' : 'clean'} (GRMS differed)` });
+      }
+    } else if (S.acceptGrmsClean && !pendingRoomWork(roomId)) {
       const recent = nowMs() - (lastDirtyWrite.get(roomId) ?? -Infinity) < DIRTY_ECHO_MS;
       if (info.dirty === false && (room.hkStatus === 'Dirty' || room.hkStatus === 'Pickup') && !recent) {
         const r = deps.pms.exec({ type: 'setHkStatus', roomIds: [roomId], status: 'Clean' }, AKUBELA_ACTOR);
@@ -817,8 +828,52 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
   }
 
   // ─────────────────────────────────────────────────────────── reconcile
+  /** OPERA → GRMS: make GRMS match OPERA. Returns the number of jobs enqueued. */
+  async function pushAll(): Promise<number> {
+    if (!deps.transport || st.mode === 'off') return 0;
+    if (!st.residences.length) { try { await refreshMasterData(); } catch { /* ignore */ } }
+    rebuildMappings();
+    const S = st.settings;
+    const s = snap();
+    const today = s.hotel?.businessDate ?? isoNow().slice(0, 10);
+    let n = 0;
+    const add = (j: NewJob) => {
+      if (activeJob(j.key, j.action)) return;
+      enqueue(j);
+      n++;
+    };
+    for (const m of st.mappings) {
+      if (!m.residenceId) continue;
+      const room = roomById(m.roomId);
+      if (!room) continue;
+      const dirty = room.hkStatus === 'Dirty' || room.hkStatus === 'Pickup';
+      // reservations first so room state is written after check-in (per-key queues are independent; order is best effort)
+      add({ key: `room:${m.roomId}`, action: 'ROOM_STATE', roomId: m.roomId, payload: { dirty }, summary: `Push: room ${room.number} → ${dirty ? 'dirty' : 'clean'}` });
+    }
+    for (const res of s.reservations) {
+      if (!res.roomId || !residenceIdOf(res.roomId)) continue;
+      const key = `resv:${res.id}`;
+      if (res.status === 'InHouse' && !openLink(res.id)) {
+        add({ key, action: 'CHECK_IN', reservationId: res.id, roomId: res.roomId, summary: `Push: check-in #${res.confirmationNo} → room ${roomNo(res.roomId)}` });
+      } else if (res.status === 'Reserved' && S.preRegisterOnAssign && res.arrival >= today && !openLink(res.id)) {
+        add({ key, action: 'PRE_REGISTER', reservationId: res.id, roomId: res.roomId, summary: `Push: pre-register #${res.confirmationNo} → room ${roomNo(res.roomId)}` });
+      }
+    }
+    for (const link of st.links.filter((l) => !l.closed)) {
+      const res = resvById(link.reservationId);
+      const key = `resv:${link.reservationId}`;
+      const mk = (action: JobAction, why: string) => add({ key, action, reservationId: link.reservationId, roomId: link.roomId, summary: `Push: ${why} #${link.confirmationNo}` });
+      if (res?.status === 'CheckedOut') mk('CHECK_OUT', 'check-out');
+      else if (!res || res.status === 'NoShow' || res.status === 'Cancelled' || (res.status === 'Reserved' && !res.roomId)) mk('CANCEL_ORDER', 'cancel order');
+    }
+    st.lastPushAt = isoNow();
+    changed();
+    return n;
+  }
+
   async function reconcile(): Promise<number> {
     if (!deps.transport || st.mode === 'off') return 0;
+    if (st.settings.syncMode === 'opera-master') return pushAll();
     if (!st.residences.length) { try { await refreshMasterData(); } catch { /* ignore */ } }
     rebuildMappings();
     let issues = 0;
@@ -929,9 +984,11 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
 
   function updateSettings(patch: Partial<AkubelaSettings>): void {
     const pollChanged = patch.pollSeconds !== undefined && patch.pollSeconds !== st.settings.pollSeconds;
+    const toMaster = patch.syncMode === 'opera-master' && st.settings.syncMode !== 'opera-master';
     st.settings = { ...st.settings, ...patch };
     if (pollChanged && pollTimer) { clearInterval(pollTimer); pollTimer = null; startPollTimer(); }
     changed();
+    if (toMaster) void pushAll().catch(() => {});
   }
 
   const unref = (t: unknown) => (t as { unref?: () => void } | null)?.unref?.();
@@ -958,6 +1015,7 @@ export function createAkubelaConnector(deps: ConnectorDeps): AkubelaConnectorApi
     drain,
     poll,
     reconcile,
+    pushAll,
     refreshMasterData,
     retryJob,
     setMapping,

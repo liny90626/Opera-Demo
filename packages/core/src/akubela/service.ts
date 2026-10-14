@@ -75,11 +75,9 @@ export function createAkubelaService(deps: AkubelaServiceDeps): AkubelaServiceAp
     if (!connector) return;
     try {
       await connector.refreshMasterData();
-      // The simulator starts with no orders: align it once with OPERA's in-house guests so the demo starts consistent.
-      // Real mode never writes to GRMS on startup; use "Reconcile" explicitly there.
-      if (mode === 'sim') {
-        await connector.reconcile();
-        // flush the repair jobs and refresh GRMS room snapshots right away (otherwise stale until the next poll)
+      // OPERA is the master: align GRMS (real or simulated) with OPERA's rooms and in-house guests once at startup.
+      if (connector.getState().settings.pushOnStart) {
+        await connector.pushAll();
         // drain() returns early for keys another (timer) drain is running, so wait until nothing is in flight (max ~5 s)
         const busy = () => connector!.getState().jobs.some((j) => j.status === 'RUNNING' || (j.status === 'PENDING' && j.nextRunAt <= now()));
         for (let i = 0; i < 100 && busy(); i++) {

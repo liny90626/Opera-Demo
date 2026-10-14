@@ -15,7 +15,7 @@ const bad = (message: string, status = 400): Res => ({ status, body: { error: me
 const isObj = (b: unknown): b is Record<string, unknown> => !!b && typeof b === 'object' && !Array.isArray(b);
 const str = (v: unknown) => typeof v === 'string' && v.length > 0;
 
-const BOOL_KEYS = ['preRegisterOnAssign', 'syncHkStatus', 'acceptGrmsClean', 'acceptGrmsDnd', 'acceptGrmsCheckout', 'doorPinOnCheckIn'] as const;
+const BOOL_KEYS = ['preRegisterOnAssign', 'syncHkStatus', 'acceptGrmsClean', 'acceptGrmsDnd', 'acceptGrmsCheckout', 'doorPinOnCheckIn', 'pushOnStart'] as const;
 const STR_KEYS = ['hotelTimezone', 'orderSource'] as const;
 const TIME_KEYS = ['checkInTime', 'checkOutTime'] as const;
 
@@ -29,6 +29,8 @@ function validateSettings(body: unknown): { patch: Partial<AkubelaSettings> } | 
       if (!str(v)) return { error: `${k} must be a non-empty string` };
     } else if ((TIME_KEYS as readonly string[]).includes(k)) {
       if (typeof v !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return { error: `${k} must be HH:mm` };
+    } else if (k === 'syncMode') {
+      if (v !== 'opera-master' && v !== 'bidirectional') return { error: "syncMode must be 'opera-master' or 'bidirectional'" };
     } else if (k === 'welcomeSceneId' || k === 'checkoutSceneId') {
       if (v !== null && typeof v !== 'string') return { error: `${k} must be string or null` };
     } else if (k === 'pollSeconds') {
@@ -112,6 +114,10 @@ export async function handleAkubelaRequest(svc: AkubelaServiceApi, method: strin
       if (!conn) return noConn();
       const issues = await conn.reconcile();
       return { status: 200, body: { issues } };
+    }
+    if (m === 'POST' && rel === '/push') {
+      if (!conn) return noConn();
+      return { status: 200, body: { jobs: await conn.pushAll() } };
     }
     if (m === 'POST' && rel === '/poll') {
       if (!conn) return noConn();
