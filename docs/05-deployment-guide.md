@@ -27,9 +27,9 @@ npm run dev       # 后端 :3001 + 前端 :5173，浏览器打开 http://localho
 
 ---
 
-## 方案 1：GitHub Pages（形态 A，已配置 CI 自动部署）
+## 方案 1：GitHub Pages（形态 A，自动部署已停用）
 
-仓库已包含 `.github/workflows/pages.yml`：每次推送到 `main` 都会 **类型检查 → 测试 → 构建 → 发布到 `gh-pages` 分支**。
+> 自动部署已停用：`.github/workflows/ci.yml` 现在只做类型检查和测试。要恢复，从 git 历史找回原 `.github/workflows/pages.yml`（含 `npm run build:pages` 和 `peaceiris/actions-gh-pages` 发布到 `gh-pages` 的步骤），再按下面的步骤开启。
 
 **一次性开启：**
 1. 打开 GitHub 仓库 → **Settings → Pages**。
