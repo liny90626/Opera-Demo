@@ -94,7 +94,7 @@ curl -s 'localhost:3001/api/events?sinceSeq=0' | jq '.events[] | {seq, eventName
 
 ## 4. 部署（GitHub Pages，更多方案见 [docs/05](docs/05-deployment-guide.md)）
 
-> GitHub Pages 自动部署已停用。`.github/workflows/ci.yml` 现在只在推送到 `main` 时做类型检查和测试。如需恢复在线演示，从 git 历史找回原 `pages.yml` 的构建/发布步骤，再按下面的说明开启 Pages。
+> GitHub Actions 工作流已全部移除（不再自动测试或部署），提交前请在本地运行 `npm run typecheck && npm test`。如需恢复在线演示，从 git 历史找回原 `.github/workflows/pages.yml`，再按下面的说明开启 Pages。
 
 **首次需要仓库管理员开启一次 Pages**：GitHub 仓库 → Settings → Pages → *Build and deployment* → Source 选 **Deploy from a branch** → Branch 选 **gh-pages / (root)** → Save。约 1 分钟后即可通过 <https://liny90626.github.io/Opera-Demo/> 访问。
 
